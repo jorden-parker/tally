@@ -4,13 +4,11 @@ import { eventsBetween } from "@/lib/store/events";
 import { loadSettings, loadSnapshots, saveSettings, type Settings } from "@/lib/store/settings";
 import { SYNC_WINDOW_DAYS, syncAll, type SyncDependencies, type SyncResult } from "@/lib/sync";
 
-export type SettingsView = Settings & { shortcutConfigured: boolean };
-
 export type Services = {
   summary: (range: Range) => Summary;
   sync: () => Promise<SyncResult>;
-  settings: () => SettingsView;
-  updateSettings: (input: unknown) => SettingsView;
+  settings: () => Settings;
+  updateSettings: (input: unknown) => Settings;
 };
 
 export class InvalidSettingsError extends Error {}
@@ -39,12 +37,9 @@ const settingsChanges = z
   .partial();
 
 export function createServices(dependencies: SyncDependencies): Services {
-  const { db, shortcut, now } = dependencies;
+  const { db, now } = dependencies;
 
-  const settings = (): SettingsView => ({
-    ...loadSettings(db),
-    shortcutConfigured: shortcut !== null,
-  });
+  const settings = (): Settings => loadSettings(db);
 
   return {
     summary: (range) => {

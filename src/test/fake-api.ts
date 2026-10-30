@@ -1,7 +1,7 @@
 import type { TallyApi } from "@/components/api";
 import type { DailyPoint, Summary } from "@/lib/metrics/summary";
 import type { TallyEvent } from "@/lib/store/events";
-import type { SettingsView } from "@/lib/server/services";
+import type { Settings } from "@/lib/store/settings";
 
 export const FIXED_NOW = new Date("2026-10-30T12:00:00Z");
 
@@ -42,13 +42,12 @@ export function makeSummary(overrides: Partial<Summary> = {}): Summary {
   };
 }
 
-export function makeSettings(overrides: Partial<SettingsView> = {}): SettingsView {
+export function makeSettings(overrides: Partial<Settings> = {}): Settings {
   return {
     allowList: ["acme"],
     weekStart: 1,
     timeZone: "UTC",
     lastSyncedAt: "2026-10-30T11:55:00Z",
-    shortcutConfigured: true,
     ...overrides,
   };
 }

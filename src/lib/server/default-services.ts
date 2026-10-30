@@ -14,11 +14,10 @@ export function createDefaultServices(): Services {
   const directory = dataDirectory();
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   fs.chmodSync(directory, 0o700);
-  const token = process.env.SHORTCUT_API_TOKEN;
   return createServices({
     db: openDatabase(path.join(directory, "tally.db")),
     run: runCommand,
-    shortcut: token ? createShortcutGet(runCommand) : null,
+    shortcut: createShortcutGet(runCommand),
     now: () => new Date(),
   });
 }

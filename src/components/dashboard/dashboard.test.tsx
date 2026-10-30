@@ -59,13 +59,11 @@ describe("Dashboard", () => {
   });
 
   it("asks for an allow-list before there is anything to count", async () => {
-    const fetchSettings = async () => makeSettings({ allowList: [], shortcutConfigured: false });
-    const runSync = vi.fn(async () => ({ errors: {} }));
+    const fetchSettings = async () => makeSettings({ allowList: [] });
     render(
       <Dashboard
         api={fakeApi({
           fetchSettings,
-          runSync,
           fetchSummary: async () => makeSummary({ lastSyncedAt: null }),
         })}
         now={now}
@@ -74,8 +72,6 @@ describe("Dashboard", () => {
 
     const link = await screen.findByRole("link", { name: "Choose them in settings" });
     expect(link.getAttribute("href")).toBe("/settings");
-    expect(screen.getByText(/SHORTCUT_API_TOKEN/)).toBeDefined();
-    expect(runSync).not.toHaveBeenCalled();
   });
 
   it("shows why loading failed", async () => {

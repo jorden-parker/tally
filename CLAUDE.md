@@ -51,12 +51,11 @@ caches them on `globalThis`. Route handlers in `src/app/api` stay thin and call
 
 - GitHub and Shortcut run independently, and failures are captured per source in
   `SyncResult.errors`. `lastSyncedAt` only advances when both succeed.
-- GitHub sync is skipped while the allow-list is empty, and Shortcut sync is
-  skipped when `SHORTCUT_API_TOKEN` is unset.
+- GitHub sync is skipped while the allow-list is empty.
 - All remote access goes through `Runner` (`src/lib/exec.ts`): `gh` for GitHub
   and `short api` for Shortcut. `short` comes from `node_modules/.bin`, so start
-  the server through `bun run`. It reads `SHORTCUT_API_TOKEN` from the inherited
-  environment, which Next loads from `.env.local`.
+  the server through `bun run`. The CLI uses its own `short install` credentials
+  or an inherited `SHORTCUT_API_TOKEN`, which Next loads from `.env.local`.
 - `createShortcutGet` keeps the `/api/v3/...` path shape and translates it to
   `short api` arguments.
 

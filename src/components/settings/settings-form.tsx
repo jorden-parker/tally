@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import type { WeekStart } from "@/lib/metrics/buckets";
-import type { SettingsView } from "@/lib/server/services";
+import type { Settings } from "@/lib/store/settings";
 import { api as realApi, type TallyApi } from "../api";
 
 type SettingsFormProps = { api?: TallyApi };
@@ -11,7 +11,7 @@ type Fields = { allowList: string; weekStart: string; timeZone: string };
 
 const TIME_ZONES = Intl.supportedValuesOf("timeZone");
 
-function toFields(view: SettingsView): Fields {
+function toFields(view: Settings): Fields {
   return {
     allowList: view.allowList.join("\n"),
     weekStart: String(view.weekStart),
@@ -23,18 +23,8 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function TokenStatus({ configured }: { configured: boolean }) {
-  return (
-    <p className="text-ink-soft">
-      {configured
-        ? "Shortcut token found"
-        : "Tickets are off. Set SHORTCUT_API_TOKEN in .env.local and restart the app."}
-    </p>
-  );
-}
-
 export function SettingsForm({ api = realApi }: SettingsFormProps) {
-  const [loaded, setLoaded] = useState<SettingsView | null>(null);
+  const [loaded, setLoaded] = useState<Settings | null>(null);
   const [fields, setFields] = useState<Fields | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -122,7 +112,6 @@ export function SettingsForm({ api = realApi }: SettingsFormProps) {
               ))}
             </datalist>
           </label>
-          <TokenStatus configured={loaded.shortcutConfigured} />
           <div className="flex items-center gap-4">
             <button type="submit" className="rounded-md bg-ink px-4 py-2 text-paper">
               Save settings

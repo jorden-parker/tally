@@ -19,7 +19,7 @@ const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 export type SyncDependencies = {
   db: DatabaseSync;
   run: Runner;
-  shortcut: ShortcutGet | null;
+  shortcut: ShortcutGet;
   now: () => Date;
 };
 
@@ -95,9 +95,7 @@ export async function syncAll(dependencies: SyncDependencies): Promise<SyncResul
     allowList.length > 0
       ? capture(errors, "github", () => syncGitHub(dependencies, allowList, now))
       : undefined,
-    shortcut
-      ? capture(errors, "shortcut", () => syncShortcut(dependencies, shortcut, now))
-      : undefined,
+    capture(errors, "shortcut", () => syncShortcut(dependencies, shortcut, now)),
   ]);
 
   if (Object.keys(errors).length === 0) saveSettings(db, { lastSyncedAt: now.toISOString() });

@@ -16,14 +16,6 @@ describe("SettingsForm", () => {
     expect(allowList.value).toBe("acme\nme/side");
     expect((screen.getByLabelText("Week starts on") as HTMLSelectElement).value).toBe("0");
     expect((screen.getByLabelText("Time zone") as HTMLInputElement).value).toBe("UTC");
-    expect(screen.getByText("Shortcut token found")).toBeDefined();
-  });
-
-  it("explains how to add the Shortcut token when it is missing", async () => {
-    const fetchSettings = async () => makeSettings({ shortcutConfigured: false });
-    render(<SettingsForm api={fakeApi({ fetchSettings })} />);
-
-    expect(await screen.findByText(/Set SHORTCUT_API_TOKEN in .env.local/)).toBeDefined();
   });
 
   it("saves the edited values and says what to do next", async () => {

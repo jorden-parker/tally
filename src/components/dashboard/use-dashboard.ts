@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Range, Summary } from "@/lib/metrics/summary";
-import type { SettingsView } from "@/lib/server/services";
+import type { Settings } from "@/lib/store/settings";
 import type { SyncResult } from "@/lib/sync";
 import type { TallyApi } from "../api";
 import { isStale } from "./format";
@@ -19,14 +19,10 @@ function describeSyncErrors(errors: SyncResult["errors"]): string[] {
   );
 }
 
-function hasAnythingToSync(settings: SettingsView): boolean {
-  return settings.allowList.length > 0 || settings.shortcutConfigured;
-}
-
 export function useDashboard(api: TallyApi, now: () => Date) {
   const [range, setRange] = useState<Range>("week");
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [settings, setSettings] = useState<SettingsView | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [reloads, setReloads] = useState(0);
@@ -65,8 +61,7 @@ export function useDashboard(api: TallyApi, now: () => Date) {
 
   useEffect(() => {
     if (autoSyncAttempted.current || !summary || !settings) return;
-    const due =
-      hasAnythingToSync(settings) && isStale(summary.lastSyncedAt, now(), AUTO_SYNC_MAX_AGE_MS);
+    const due = isStale(summary.lastSyncedAt, now(), AUTO_SYNC_MAX_AGE_MS);
     if (!due) {
       autoSyncAttempted.current = true;
       return;

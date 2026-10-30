@@ -12,7 +12,7 @@ from you, and stories in progress.
 - [Node.js](https://nodejs.org) 22.22.2 or later
 - [Bun](https://bun.sh)
 - [GitHub CLI](https://cli.github.com), signed in with `gh auth login`
-- A Shortcut API token, if you want ticket counts
+- A Shortcut account, if you want ticket counts
 
 ## Getting started
 
@@ -39,11 +39,9 @@ list, so GitHub sync stays off until you add one.
 
 ### Shortcut
 
-To include tickets, add your token to `.env.local` and restart the server:
-
-```sh
-SHORTCUT_API_TOKEN=your-token
-```
+To include tickets, run `bunx short install` once, then check it with
+`bun run shortcut:whoami`. Setting `SHORTCUT_API_TOKEN` in `.env.local` also
+works.
 
 ## How it works
 

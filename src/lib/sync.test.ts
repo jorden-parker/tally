@@ -117,7 +117,7 @@ describe("syncAll", () => {
   it("asks GitHub for the last 60 days", async () => {
     const { run, calls } = fakeGitHub();
 
-    await syncAll({ db, run, shortcut: null, now: () => NOW });
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
 
     const created = calls.find((args) => args.includes("--created")) ?? [];
     const merged = calls.find((args) => args.includes("--merged-at")) ?? [];
@@ -138,13 +138,15 @@ describe("syncAll", () => {
     expect(calls).toEqual([]);
   });
 
-  it("skips Shortcut when there is no token", async () => {
+  it("always asks Shortcut, and reports the CLI's message when it is not set up", async () => {
     const { run } = fakeGitHub();
+    const shortcut: ShortcutGet = async () => {
+      throw new Error("Please run 'short install'");
+    };
 
-    const result = await syncAll({ db, run, shortcut: null, now: () => NOW });
+    const result = await syncAll({ db, run, shortcut, now: () => NOW });
 
-    expect(result.errors).toEqual({});
-    expect(storedEvents().some((event) => event.source === "shortcut")).toBe(false);
+    expect(result.errors.shortcut).toContain("short install");
   });
 
   it("reports a failing source, still syncs the other, and leaves the sync time alone", async () => {

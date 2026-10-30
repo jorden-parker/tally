@@ -1,5 +1,4 @@
 import type { Range, Summary } from "@/lib/metrics/summary";
-import type { SettingsView } from "@/lib/server/services";
 import type { Settings } from "@/lib/store/settings";
 import type { SyncResult } from "@/lib/sync";
 
@@ -7,9 +6,9 @@ export type SettingsChanges = Partial<Pick<Settings, "allowList" | "weekStart" |
 
 export type TallyApi = {
   fetchSummary: (range: Range) => Promise<Summary>;
-  fetchSettings: () => Promise<SettingsView>;
+  fetchSettings: () => Promise<Settings>;
   runSync: () => Promise<SyncResult>;
-  saveSettings: (changes: SettingsChanges) => Promise<SettingsView>;
+  saveSettings: (changes: SettingsChanges) => Promise<Settings>;
 };
 
 const JSON_HEADERS = { "content-type": "application/json" };

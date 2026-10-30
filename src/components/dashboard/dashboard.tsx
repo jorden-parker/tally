@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { RANGES, type Range, type Summary } from "@/lib/metrics/summary";
-import type { SettingsView } from "@/lib/server/services";
+import type { Settings } from "@/lib/store/settings";
 import { api as realApi, type TallyApi } from "../api";
 import { DailyChart } from "./daily-chart";
 import { formatSynced } from "./format";
@@ -38,7 +38,7 @@ function RangeSwitch({ range, onChange }: { range: Range; onChange: (range: Rang
   );
 }
 
-function SetupNotes({ settings }: { settings: SettingsView }) {
+function SetupNotes({ settings }: { settings: Settings }) {
   return (
     <div className="flex flex-col gap-1 text-ink-soft">
       {settings.allowList.length === 0 ? (
@@ -50,9 +50,6 @@ function SetupNotes({ settings }: { settings: SettingsView }) {
           .
         </p>
       ) : null}
-      {settings.shortcutConfigured ? null : (
-        <p>Tickets are off. Set SHORTCUT_API_TOKEN in .env.local and restart the app.</p>
-      )}
     </div>
   );
 }

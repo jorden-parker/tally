@@ -4,16 +4,20 @@ import { openDatabase } from "@/lib/store/database";
 import { upsertEvents } from "@/lib/store/events";
 import { loadSettings, saveSettings } from "@/lib/store/settings";
 import { createServices, InvalidSettingsError, type Services } from "./services";
+import type { ShortcutGet } from "@/lib/shortcut/client";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
 
-function services(db: DatabaseSync, hasShortcut = false): Services {
+const emptyShortcut: ShortcutGet = async <T>() =>
+  ({ mention_name: "jorden", data: [], next: null }) as T;
+
+function services(db: DatabaseSync): Services {
   return createServices({
     db,
     run: async () => {
       throw new Error("gh must not run in this test");
     },
-    shortcut: hasShortcut ? async () => ({}) as never : null,
+    shortcut: emptyShortcut,
     now: () => NOW,
   });
 }
@@ -43,11 +47,6 @@ describe("services", () => {
 
     expect(summary.current.created).toBe(1);
     expect(summary.range).toBe("day");
-  });
-
-  it("reports whether a Shortcut token is configured", () => {
-    expect(services(db, false).settings().shortcutConfigured).toBe(false);
-    expect(services(db, true).settings().shortcutConfigured).toBe(true);
   });
 
   it("syncs through the sync module and stamps the time", async () => {

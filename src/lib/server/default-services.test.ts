@@ -14,7 +14,6 @@ describe("createDefaultServices", () => {
 
   afterEach(() => {
     delete process.env.TALLY_DATA_DIR;
-    delete process.env.SHORTCUT_API_TOKEN;
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
@@ -39,13 +38,5 @@ describe("createDefaultServices", () => {
     createDefaultServices();
 
     expect(fs.statSync(path.join(directory, "nested")).mode & 0o777).toBe(0o700);
-  });
-
-  it("enables Shortcut only when a token is set", () => {
-    expect(createDefaultServices().settings().shortcutConfigured).toBe(false);
-
-    process.env.SHORTCUT_API_TOKEN = "token";
-
-    expect(createDefaultServices().settings().shortcutConfigured).toBe(true);
   });
 });
