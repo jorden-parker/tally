@@ -1,8 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Runner } from "@/lib/exec";
 import { filterToAllowList, isAllowed } from "@/lib/github/allow-list";
-import { fetchCreatedPrs, fetchReviewedPrs, type TimeWindow } from "@/lib/github/contributions";
-import { fetchMergedPrs, fetchOpenPrRepos } from "@/lib/github/pull-requests";
+import { fetchCreatedPrs, fetchMergedPrs, fetchOpenPrRepos } from "@/lib/github/pull-requests";
+import { fetchReviewedPrs } from "@/lib/github/reviews";
 import type { ShortcutGet } from "@/lib/shortcut/client";
 import {
   countInProgressStories,
@@ -40,12 +40,13 @@ function errorMessage(error: unknown): string {
 async function syncGitHub(
   { db, run }: SyncDependencies,
   allowList: string[],
-  window: TimeWindow,
+  now: Date,
 ): Promise<void> {
+  const sinceDate = dayOf(daysFrom(now, -SYNC_WINDOW_DAYS));
   const [reviewed, created, merged, authoredRepos, requestedRepos] = await Promise.all([
-    fetchReviewedPrs(run, window),
-    fetchCreatedPrs(run, window),
-    fetchMergedPrs(run, window.from.slice(0, 10)),
+    fetchReviewedPrs(run, sinceDate),
+    fetchCreatedPrs(run, sinceDate),
+    fetchMergedPrs(run, sinceDate),
     fetchOpenPrRepos(run, "authored"),
     fetchOpenPrRepos(run, "review-requested"),
   ]);
@@ -56,7 +57,7 @@ async function syncGitHub(
       openAuthoredPrs: authoredRepos.filter((repo) => isAllowed(repo, allowList)).length,
       reviewRequestedPrs: requestedRepos.filter((repo) => isAllowed(repo, allowList)).length,
     },
-    window.to,
+    now.toISOString(),
   );
 }
 
@@ -88,12 +89,11 @@ export async function syncAll(dependencies: SyncDependencies): Promise<SyncResul
   const { db, shortcut } = dependencies;
   const now = dependencies.now();
   const { allowList } = loadSettings(db);
-  const window = { from: daysFrom(now, -SYNC_WINDOW_DAYS).toISOString(), to: now.toISOString() };
   const errors: SyncResult["errors"] = {};
 
   await Promise.all([
     allowList.length > 0
-      ? capture(errors, "github", () => syncGitHub(dependencies, allowList, window))
+      ? capture(errors, "github", () => syncGitHub(dependencies, allowList, now))
       : undefined,
     shortcut
       ? capture(errors, "shortcut", () => syncShortcut(dependencies, shortcut, now))

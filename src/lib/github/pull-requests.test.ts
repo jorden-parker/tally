@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Runner } from "@/lib/exec";
-import { fetchMergedPrs, fetchOpenPrRepos } from "./pull-requests";
+import { fetchCreatedPrs, fetchMergedPrs, fetchOpenPrRepos } from "./pull-requests";
 
 function recordingRunner(output: unknown) {
   const calls: string[][] = [];
@@ -40,6 +40,34 @@ describe("fetchMergedPrs", () => {
       expect.arrayContaining(["gh", "search", "prs", "--author", "@me", "--merged"]),
     );
     expect(calls[0]).toEqual(expect.arrayContaining(["--merged-at", ">=2026-09-01"]));
+  });
+});
+
+describe("fetchCreatedPrs", () => {
+  it("searches my PRs created since the date and maps createdAt", async () => {
+    const { run, calls } = recordingRunner([
+      {
+        title: "Fix flake",
+        url: "https://github.com/acme/web/pull/9",
+        createdAt: "2026-10-29T08:00:00Z",
+        repository: { nameWithOwner: "acme/web" },
+      },
+    ]);
+
+    expect(await fetchCreatedPrs(run, "2026-09-01")).toEqual([
+      {
+        source: "github",
+        kind: "pr_created",
+        externalId: "https://github.com/acme/web/pull/9",
+        occurredAt: "2026-10-29T08:00:00Z",
+        repo: "acme/web",
+        title: "Fix flake",
+        url: "https://github.com/acme/web/pull/9",
+      },
+    ]);
+    expect(calls[0]).toEqual(
+      expect.arrayContaining(["--author", "@me", "--created", ">=2026-09-01"]),
+    );
   });
 });
 

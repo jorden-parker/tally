@@ -9,18 +9,6 @@ import { syncAll } from "./sync";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
 
-function contributionPage(connection: string, nodes: unknown[]): string {
-  return JSON.stringify({
-    data: {
-      viewer: {
-        contributionsCollection: {
-          [connection]: { pageInfo: { hasNextPage: false, endCursor: null }, nodes },
-        },
-      },
-    },
-  });
-}
-
 function pullRequest(repo: string, number: number) {
   return {
     title: `PR ${number}`,
@@ -29,31 +17,36 @@ function pullRequest(repo: string, number: number) {
   };
 }
 
+function reviewSearchPage(): string {
+  const reviewed = (repo: string, number: number, reviewUrl: string) => ({
+    ...pullRequest(repo, number),
+    reviews: { nodes: [{ url: reviewUrl, submittedAt: "2026-10-28T10:00:00Z" }] },
+  });
+  return JSON.stringify({
+    data: {
+      search: {
+        pageInfo: { hasNextPage: false, endCursor: null },
+        nodes: [
+          reviewed("acme/api", 1, "review-allowed"),
+          reviewed("stranger/lib", 2, "review-blocked"),
+        ],
+      },
+    },
+  });
+}
+
 function fakeGitHub(): { run: Runner; calls: string[][] } {
   const calls: string[][] = [];
   const run: Runner = async (_command, args) => {
     calls.push(args);
     const joined = args.join(" ");
-    if (args[0] === "api") {
-      return joined.includes("pullRequestReviewContributions")
-        ? contributionPage("pullRequestReviewContributions", [
-            {
-              occurredAt: "2026-10-28T10:00:00Z",
-              pullRequestReview: { url: "review-allowed" },
-              pullRequest: pullRequest("acme/api", 1),
-            },
-            {
-              occurredAt: "2026-10-28T11:00:00Z",
-              pullRequestReview: { url: "review-blocked" },
-              pullRequest: pullRequest("stranger/lib", 2),
-            },
-          ])
-        : contributionPage("pullRequestContributions", [
-            { occurredAt: "2026-10-29T08:00:00Z", pullRequest: pullRequest("acme/web", 3) },
-          ]);
-    }
+    if (args[0] === "api" && args[1] === "user") return "jorden-parker\n";
+    if (args[0] === "api") return reviewSearchPage();
     if (joined.includes("--merged")) {
       return JSON.stringify([{ ...pullRequest("acme/api", 4), closedAt: "2026-10-27T16:00:00Z" }]);
+    }
+    if (joined.includes("--created")) {
+      return JSON.stringify([{ ...pullRequest("acme/web", 3), createdAt: "2026-10-29T08:00:00Z" }]);
     }
     if (joined.includes("--review-requested")) {
       return JSON.stringify([
@@ -126,9 +119,14 @@ describe("syncAll", () => {
 
     await syncAll({ db, run, shortcut: null, now: () => NOW });
 
-    const graphql = calls.find((args) => args[0] === "api") ?? [];
-    expect(graphql).toContain("from=2026-08-31T12:00:00.000Z");
-    expect(graphql).toContain("to=2026-10-30T12:00:00.000Z");
+    const created = calls.find((args) => args.includes("--created")) ?? [];
+    const merged = calls.find((args) => args.includes("--merged-at")) ?? [];
+    const reviews = calls.find((args) => args[1] === "graphql") ?? [];
+    expect(created).toContain(">=2026-08-31");
+    expect(merged).toContain(">=2026-08-31");
+    expect(reviews).toContain(
+      "search=is:pr reviewed-by:jorden-parker -author:jorden-parker updated:>=2026-08-31",
+    );
   });
 
   it("does not call GitHub while the allow-list is empty", async () => {
