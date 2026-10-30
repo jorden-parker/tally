@@ -30,6 +30,34 @@ describe("fetchMentionName", () => {
 });
 
 describe("fetchCompletedStories", () => {
+  it("keeps the estimate, type and start time, and nulls whatever Shortcut omits", async () => {
+    const get: ShortcutGet = async <T>() =>
+      ({
+        data: [
+          {
+            ...story(1, "2026-10-29T09:00:00Z"),
+            estimate: 3,
+            story_type: "bug",
+            started_at: "2026-10-26T09:00:00Z",
+          },
+          story(2, "2026-10-29T10:00:00Z"),
+        ],
+        next: null,
+      }) as T;
+
+    const [estimated, bare] = await fetchCompletedStories(get, "jorden", window);
+
+    expect(estimated).toMatchObject({
+      points: 3,
+      storyType: "bug",
+      startedAt: "2026-10-26T09:00:00Z",
+      additions: null,
+      deletions: null,
+      changedFiles: null,
+    });
+    expect(bare).toMatchObject({ points: null, startedAt: null });
+  });
+
   const window = { fromDay: "2026-09-01", toDay: "2026-10-31" };
 
   it("searches my done stories in the window and maps them to events", async () => {
@@ -51,6 +79,12 @@ describe("fetchCompletedStories", () => {
         repo: null,
         title: "Story 11",
         url: "https://app.shortcut.com/acme/story/11",
+        startedAt: null,
+        points: null,
+        storyType: null,
+        additions: null,
+        deletions: null,
+        changedFiles: null,
       },
     ]);
   });
@@ -102,6 +136,7 @@ describe("fetchAssignedStories", () => {
         source: "shortcut",
         externalId: "31",
         openedAt: "2026-10-01T09:00:00Z",
+        isDraft: false,
         repo: null,
         title: "Story 31",
         url: "https://app.shortcut.com/acme/story/31",

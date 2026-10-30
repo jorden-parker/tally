@@ -14,7 +14,7 @@ export type TallyEvent = {
   url: string;
 };
 
-type EventRow = {
+export type EventRow = {
   source: EventSource;
   kind: EventKind;
   external_id: string;
@@ -41,7 +41,7 @@ const BETWEEN = `
   ORDER BY occurred_at ASC, external_id ASC
 `;
 
-function toEvent(row: EventRow): TallyEvent {
+export function toEvent(row: EventRow): TallyEvent {
   return {
     source: row.source,
     kind: row.kind,

@@ -10,7 +10,9 @@ const SECTIONS: { title: string; key: keyof Summary["lists"] }[] = [
   { title: "Tickets completed", key: "completed" },
 ];
 
-type ListedItem = Pick<TallyEvent, "externalId" | "title" | "url" | "repo">;
+type ListedItem = Pick<TallyEvent, "externalId" | "title" | "url" | "repo"> & {
+  isDraft?: boolean;
+};
 
 function Item({ item }: { item: ListedItem }) {
   return (
@@ -23,6 +25,7 @@ function Item({ item }: { item: ListedItem }) {
       >
         {item.title}
       </a>
+      {item.isDraft ? <span className="text-sm text-ink-soft">Draft</span> : null}
       {item.repo ? <span className="text-sm text-ink-soft">{item.repo}</span> : null}
     </li>
   );

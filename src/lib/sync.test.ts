@@ -6,6 +6,7 @@ import { openDatabase } from "@/lib/store/database";
 import { eventsBetween } from "@/lib/store/events";
 import { loadOpenItems } from "@/lib/store/open-items";
 import { loadSettings, loadSnapshots, saveSettings } from "@/lib/store/settings";
+import { completedWork } from "@/lib/store/work";
 import { syncAll } from "./sync";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
@@ -36,16 +37,33 @@ function reviewSearchPage(): string {
   });
 }
 
+function mergedSearchPage(): string {
+  const merged = (repo: string, number: number) => ({
+    ...pullRequest(repo, number),
+    createdAt: "2026-10-25T16:00:00Z",
+    mergedAt: "2026-10-27T16:00:00Z",
+    additions: 120,
+    deletions: 30,
+    changedFiles: 4,
+  });
+  return JSON.stringify({
+    data: {
+      search: {
+        pageInfo: { hasNextPage: false, endCursor: null },
+        nodes: [merged("acme/api", 4), merged("stranger/lib", 8)],
+      },
+    },
+  });
+}
+
 function fakeGitHub(): { run: Runner; calls: string[][] } {
   const calls: string[][] = [];
   const run: Runner = async (_command, args) => {
     calls.push(args);
     const joined = args.join(" ");
     if (args[0] === "api" && args[1] === "user") return "jorden-parker\n";
+    if (joined.includes("is:merged")) return mergedSearchPage();
     if (args[0] === "api") return reviewSearchPage();
-    if (joined.includes("--merged")) {
-      return JSON.stringify([{ ...pullRequest("acme/api", 4), closedAt: "2026-10-27T16:00:00Z" }]);
-    }
     if (joined.includes("--created")) {
       return JSON.stringify([{ ...pullRequest("acme/web", 3), createdAt: "2026-10-29T08:00:00Z" }]);
     }
@@ -56,9 +74,9 @@ function fakeGitHub(): { run: Runner; calls: string[][] } {
       ]);
     }
     return JSON.stringify([
-      { ...pullRequest("acme/api", 5), createdAt: "2026-10-20T08:00:00Z" },
-      { ...pullRequest("acme/web", 6), createdAt: "2026-10-22T08:00:00Z" },
-      { ...pullRequest("stranger/lib", 7), createdAt: "2026-10-23T08:00:00Z" },
+      { ...pullRequest("acme/api", 5), createdAt: "2026-10-20T08:00:00Z", isDraft: false },
+      { ...pullRequest("acme/web", 6), createdAt: "2026-10-22T08:00:00Z", isDraft: true },
+      { ...pullRequest("stranger/lib", 7), createdAt: "2026-10-23T08:00:00Z", isDraft: true },
     ]);
   };
   return { run, calls };
@@ -99,6 +117,9 @@ const fakeShortcut: ShortcutGet = async <T>(path: string) => {
               name: "Ship tally",
               app_url: "https://app.shortcut.com/acme/story/21",
               completed_at: "2026-10-29T09:00:00Z",
+              started_at: "2026-10-26T09:00:00Z",
+              estimate: 3,
+              story_type: "feature",
             },
           ],
           next: null,
@@ -123,6 +144,31 @@ describe("syncAll", () => {
       .filter((item) => item.source === "github")
       .map((item) => item.externalId);
   }
+
+  it("stores size and timing for allowed merged PRs and completed stories", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    const work = completedWork(db, "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z");
+    expect(work.map((item) => [item.title, item.additions, item.points])).toEqual([
+      ["Ship tally", null, 3],
+      ["PR 4", 120, null],
+    ]);
+    expect(work.map((item) => item.startedAt)).toEqual([
+      "2026-10-26T09:00:00Z",
+      "2026-10-25T16:00:00Z",
+    ]);
+  });
+
+  it("stores which allowed open PRs are drafts", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    const drafts = loadOpenItems(db).filter((item) => item.isDraft);
+    expect(drafts.map((item) => item.externalId)).toEqual(["https://github.com/acme/web/pull/6"]);
+  });
 
   it("stores allowed events from both sources, the snapshots and the sync time", async () => {
     const { run } = fakeGitHub();
@@ -190,10 +236,10 @@ describe("syncAll", () => {
     await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
 
     const created = calls.find((args) => args.includes("--created")) ?? [];
-    const merged = calls.find((args) => args.includes("--merged-at")) ?? [];
+    const merged = calls.find((args) => args.join(" ").includes("is:merged")) ?? [];
     const reviews = calls.find((args) => args[1] === "graphql") ?? [];
     expect(created).toContain(">=2026-08-31");
-    expect(merged).toContain(">=2026-08-31");
+    expect(merged.join(" ")).toContain("merged:>=2026-08-31");
     expect(reviews).toContain(
       "search=is:pr reviewed-by:jorden-parker -author:jorden-parker updated:>=2026-08-31",
     );
@@ -239,7 +285,7 @@ describe("syncAll", () => {
   it("keeps reviews when another GitHub call fails", async () => {
     const { run: healthyGitHub } = fakeGitHub();
     const run: Runner = async (command, args) => {
-      if (args.join(" ").includes("--merged")) throw new Error("merged search failed");
+      if (args.join(" ").includes("is:merged")) throw new Error("merged search failed");
       return healthyGitHub(command, args);
     };
 
@@ -260,6 +306,7 @@ describe("syncAll", () => {
         source: "shortcut",
         externalId: "31",
         openedAt: "2026-10-10T09:00:00Z",
+        isDraft: false,
         repo: null,
         title: "Plan the rollout",
         url: "https://app.shortcut.com/acme/story/31",

@@ -8,6 +8,11 @@ It also shows what is open right now: your open pull requests, which it lists in
 full, reviews requested from you, stories in progress, and every ticket assigned
 to you.
 
+The **Work log** page is your evidence of what you shipped. Pick any dates to
+see every merged PR with its size and time to merge, every completed ticket with
+its type, points and time to finish, and your current draft PRs. Copy the report
+as Markdown or download it for a review.
+
 ## Requirements
 
 - [Node.js](https://nodejs.org) 22.22.2 or later
@@ -52,6 +57,11 @@ Tally syncs the last 60 days of activity through the `gh` and `short`
 command-line tools, so it uses their credentials and stores no GitHub
 credentials of its own. It syncs when you open the dashboard if the last sync is
 more than 10 minutes old, and **Sync now** runs one on demand.
+
+Synced work is never deleted, so the work log grows past 60 days as you keep
+using Tally. It can't show work from before your first sync's 60-day window.
+Work first synced before size and points were recorded shows a dash, unless a
+later sync still reaches it.
 
 Data is kept in a SQLite database at `~/.local/share/tally/tally.db`. Set
 `TALLY_DATA_DIR` to keep it somewhere else.

@@ -18,6 +18,7 @@ import {
 import { upsertEvents, type EventSource } from "@/lib/store/events";
 import { replaceOpenItems } from "@/lib/store/open-items";
 import { loadSettings, recordSnapshots, saveSettings } from "@/lib/store/settings";
+import { upsertWorkDetails } from "@/lib/store/work";
 
 export const SYNC_WINDOW_DAYS = 60;
 
@@ -67,13 +68,12 @@ async function syncGitHub(
   ]);
   const [reviewed, created, merged, openAuthored, requestedRepos] = results;
   const reviews = settledValue(reviewed, []);
-  upsertEvents(
-    db,
-    filterToAllowList(
-      [...reviews, ...settledValue(created, []), ...settledValue(merged, [])],
-      allowList,
-    ),
-  );
+  const mergedPrs = filterToAllowList(settledValue(merged, []), allowList);
+  upsertEvents(db, [
+    ...filterToAllowList([...reviews, ...settledValue(created, [])], allowList),
+    ...mergedPrs,
+  ]);
+  upsertWorkDetails(db, mergedPrs);
   uncountedReviewRepos.push(...uncountedRepos(reviews, allowList));
   if (openAuthored.status === "fulfilled") {
     const openPrs = filterToAllowList(openAuthored.value, allowList);
@@ -96,6 +96,7 @@ async function syncShortcut({ db }: SyncDependencies, get: ShortcutGet, now: Dat
   };
   const completed = await fetchCompletedStories(get, mentionName, window);
   upsertEvents(db, completed);
+  upsertWorkDetails(db, completed);
   const storiesInProgress = await countInProgressStories(get, mentionName);
   recordSnapshots(db, { storiesInProgress }, now.toISOString());
   replaceOpenItems(db, "shortcut", await fetchAssignedStories(get, mentionName));

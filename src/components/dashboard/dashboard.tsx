@@ -97,6 +97,9 @@ export function Dashboard({ api = realApi, now = currentTime }: DashboardProps) 
           >
             {syncing ? "Syncing…" : "Sync now"}
           </button>
+          <Link href="/work" className="underline underline-offset-4">
+            Work log
+          </Link>
           <Link href="/settings" className="underline underline-offset-4">
             Settings
           </Link>

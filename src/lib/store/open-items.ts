@@ -5,6 +5,7 @@ export type OpenItem = {
   source: EventSource;
   externalId: string;
   openedAt: string;
+  isDraft: boolean;
   repo: string | null;
   title: string;
   url: string;
@@ -14,6 +15,7 @@ type OpenItemRow = {
   source: EventSource;
   external_id: string;
   opened_at: string;
+  is_draft: number;
   repo: string | null;
   title: string;
   url: string;
@@ -21,15 +23,22 @@ type OpenItemRow = {
 
 const DELETE_SOURCE = `DELETE FROM open_items WHERE source = ?`;
 
+const DELETE_SOURCE_DRAFTS = `DELETE FROM draft_items WHERE source = ?`;
+
 const INSERT = `
   INSERT INTO open_items (source, external_id, opened_at, repo, title, url)
   VALUES (?, ?, ?, ?, ?, ?)
 `;
 
+const INSERT_DRAFT = `INSERT INTO draft_items (source, external_id) VALUES (?, ?)`;
+
 const ALL = `
-  SELECT source, external_id, opened_at, repo, title, url
+  SELECT
+    open_items.source, open_items.external_id, opened_at, repo, title, url,
+    draft_items.external_id IS NOT NULL AS is_draft
   FROM open_items
-  ORDER BY opened_at DESC, external_id ASC
+  LEFT JOIN draft_items USING (source, external_id)
+  ORDER BY opened_at DESC, open_items.external_id ASC
 `;
 
 function toOpenItem(row: OpenItemRow): OpenItem {
@@ -37,6 +46,7 @@ function toOpenItem(row: OpenItemRow): OpenItem {
     source: row.source,
     externalId: row.external_id,
     openedAt: row.opened_at,
+    isDraft: row.is_draft === 1,
     repo: row.repo,
     title: row.title,
     url: row.url,
@@ -45,9 +55,12 @@ function toOpenItem(row: OpenItemRow): OpenItem {
 
 export function replaceOpenItems(db: DatabaseSync, source: EventSource, items: OpenItem[]): void {
   db.prepare(DELETE_SOURCE).run(source);
+  db.prepare(DELETE_SOURCE_DRAFTS).run(source);
   const statement = db.prepare(INSERT);
+  const draftStatement = db.prepare(INSERT_DRAFT);
   for (const item of items) {
     statement.run(item.source, item.externalId, item.openedAt, item.repo, item.title, item.url);
+    if (item.isDraft) draftStatement.run(item.source, item.externalId);
   }
 }
 

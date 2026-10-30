@@ -47,6 +47,7 @@ function openPr(number: number): OpenItem {
     source: "github",
     externalId: `https://github.com/acme/api/pull/${number}`,
     openedAt: "2026-10-20T10:00:00Z",
+    isDraft: false,
     repo: "acme/api",
     title: `PR ${number}`,
     url: `https://github.com/acme/api/pull/${number}`,
@@ -60,6 +61,12 @@ describe("OpenLists", () => {
     const link = within(section("Your open PRs")).getByRole("link", { name: "Tidy the proxy" });
     expect(link.getAttribute("href")).toBe("https://example.test/Tidy%20the%20proxy");
     expect(within(section("Your open PRs")).getByText("acme/api")).toBeDefined();
+  });
+
+  it("marks draft PRs and leaves ready ones unmarked", () => {
+    render(<OpenLists open={{ prs: [{ ...openPr(1), isDraft: true }, openPr(2)], tickets: [] }} />);
+
+    expect(within(section("Your open PRs")).getAllByText("Draft")).toHaveLength(1);
   });
 
   it("shows every item of a long list, with no overflow note", () => {

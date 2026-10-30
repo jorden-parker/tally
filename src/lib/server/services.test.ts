@@ -4,7 +4,8 @@ import { openDatabase } from "@/lib/store/database";
 import { upsertEvents } from "@/lib/store/events";
 import { replaceOpenItems } from "@/lib/store/open-items";
 import { loadSettings, saveSettings } from "@/lib/store/settings";
-import { createServices, InvalidSettingsError, type Services } from "./services";
+import { upsertWorkDetails, type WorkItem } from "@/lib/store/work";
+import { createServices, InvalidSettingsError, parseDayRange, type Services } from "./services";
 import type { ShortcutGet } from "@/lib/shortcut/client";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
@@ -22,6 +23,29 @@ function services(db: DatabaseSync): Services {
     now: () => NOW,
   });
 }
+
+describe("parseDayRange", () => {
+  it("accepts a real, ordered pair of days", () => {
+    expect(parseDayRange("2026-10-01", "2026-10-30")).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-30",
+    });
+  });
+
+  it("accepts a single day", () => {
+    expect(parseDayRange("2026-10-01", "2026-10-01")).not.toBeNull();
+  });
+
+  it.each([
+    [null, "2026-10-30"],
+    ["2026-10-01", null],
+    ["yesterday", "2026-10-30"],
+    ["2026-02-31", "2026-03-01"],
+    ["2026-10-30", "2026-10-01"],
+  ])("rejects %s to %s", (from, to) => {
+    expect(parseDayRange(from, to)).toBeNull();
+  });
+});
 
 describe("services", () => {
   let db: DatabaseSync;
@@ -56,6 +80,7 @@ describe("services", () => {
         source: "github",
         externalId: "https://github.com/acme/api/pull/3",
         openedAt: "2026-10-20T08:00:00Z",
+        isDraft: false,
         repo: "acme/api",
         title: "Add retries",
         url: "https://github.com/acme/api/pull/3",
@@ -66,6 +91,7 @@ describe("services", () => {
         source: "shortcut",
         externalId: "31",
         openedAt: "2026-10-10T09:00:00Z",
+        isDraft: false,
         repo: null,
         title: "Plan the rollout",
         url: "https://app.shortcut.com/acme/story/31",
@@ -76,6 +102,57 @@ describe("services", () => {
 
     expect(summary.open.prs.map((item) => item.title)).toEqual(["Add retries"]);
     expect(summary.open.tickets.map((item) => item.title)).toEqual(["Plan the rollout"]);
+  });
+
+  describe("work", () => {
+    function mergedPr(occurredAt: string): WorkItem {
+      return {
+        source: "github",
+        kind: "pr_merged",
+        externalId: occurredAt,
+        occurredAt,
+        repo: "acme/api",
+        title: "Ship it",
+        url: "https://github.com/acme/api/pull/4",
+        startedAt: null,
+        points: null,
+        storyType: null,
+        additions: 10,
+        deletions: 2,
+        changedFiles: 1,
+      };
+    }
+
+    function store(...items: WorkItem[]) {
+      upsertEvents(db, items);
+      upsertWorkDetails(db, items);
+    }
+
+    it("reports work older than the sync window", () => {
+      store(mergedPr("2025-03-10T10:00:00Z"));
+
+      const report = services(db).work({ from: "2025-03-01", to: "2025-03-31" });
+
+      expect(report.totals.additions).toBe(10);
+    });
+
+    it("includes the whole last day in a time zone behind UTC", () => {
+      saveSettings(db, { timeZone: "America/New_York" });
+      store(mergedPr("2026-11-01T03:00:00Z"));
+
+      const report = services(db).work({ from: "2026-10-31", to: "2026-10-31" });
+
+      expect(report.prs).toHaveLength(1);
+    });
+
+    it("includes the whole first day in a time zone ahead of UTC", () => {
+      saveSettings(db, { timeZone: "Pacific/Auckland" });
+      store(mergedPr("2026-09-30T20:00:00Z"));
+
+      const report = services(db).work({ from: "2026-10-01", to: "2026-10-01" });
+
+      expect(report.prs).toHaveLength(1);
+    });
   });
 
   it("syncs through the sync module and stamps the time", async () => {

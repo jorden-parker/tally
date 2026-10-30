@@ -1,4 +1,5 @@
 import type { Range } from "@/lib/metrics/summary";
+import { plural } from "@/lib/text";
 
 const COMPARISON_LABELS: Record<Range, string> = {
   day: "yesterday",
@@ -34,10 +35,6 @@ export function formatDay(dayKey: string): string {
     day: "numeric",
     timeZone: "UTC",
   });
-}
-
-function plural(count: number, unit: string): string {
-  return `${count} ${unit}${count === 1 ? "" : "s"}`;
 }
 
 export function formatSynced(lastSyncedAt: string | null, now: Date): string {

@@ -9,7 +9,7 @@ const AUTO_SYNC_MAX_AGE_MS = 10 * 60 * 1000;
 
 const SOURCE_LABELS = { github: "GitHub", shortcut: "Shortcut" };
 
-function messageOf(error: unknown): string {
+export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 

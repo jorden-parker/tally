@@ -17,6 +17,14 @@ describe("api", () => {
     fetchMock.mockReset();
   });
 
+  it("fetches the work report for a period", async () => {
+    respond({ from: "2026-10-01" });
+
+    await api.fetchWork({ from: "2026-10-01", to: "2026-10-30" });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/work?from=2026-10-01&to=2026-10-30", undefined);
+  });
+
   it("fetches the summary for a range", async () => {
     respond({ range: "day" });
 

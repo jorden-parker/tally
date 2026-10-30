@@ -1,12 +1,16 @@
 import { z } from "zod";
-import { summarize, type Range, type Summary } from "@/lib/metrics/summary";
+import { shiftDay } from "@/lib/metrics/buckets";
+import { summarize, type DayRange, type Range, type Summary } from "@/lib/metrics/summary";
+import { workReport, type WorkReport } from "@/lib/metrics/work";
 import { eventsBetween } from "@/lib/store/events";
 import { loadOpenItems } from "@/lib/store/open-items";
 import { loadSettings, loadSnapshots, saveSettings, type Settings } from "@/lib/store/settings";
+import { completedWork } from "@/lib/store/work";
 import { SYNC_WINDOW_DAYS, syncAll, type SyncDependencies, type SyncResult } from "@/lib/sync";
 
 export type Services = {
   summary: (range: Range) => Summary;
+  work: (period: DayRange) => WorkReport;
   sync: () => Promise<SyncResult>;
   settings: () => Settings;
   updateSettings: (input: unknown) => Settings;
@@ -37,6 +41,19 @@ const settingsChanges = z
   })
   .partial();
 
+const dayRange = z
+  .object({ from: z.iso.date(), to: z.iso.date() })
+  .refine(({ from, to }) => from <= to);
+
+export function parseDayRange(from: string | null, to: string | null): DayRange | null {
+  const parsed = dayRange.safeParse({ from, to });
+  return parsed.success ? parsed.data : null;
+}
+
+function startOfDay(day: string): string {
+  return `${day}T00:00:00Z`;
+}
+
 export function createServices(dependencies: SyncDependencies): Services {
   const { db, now } = dependencies;
 
@@ -56,6 +73,17 @@ export function createServices(dependencies: SyncDependencies): Services {
         now: current,
       });
     },
+    work: (period) =>
+      workReport({
+        items: completedWork(
+          db,
+          startOfDay(shiftDay(period.from, -1)),
+          startOfDay(shiftDay(period.to, 2)),
+        ),
+        openItems: loadOpenItems(db),
+        settings: loadSettings(db),
+        period,
+      }),
     sync: () => syncAll(dependencies),
     settings,
     updateSettings: (input) => {

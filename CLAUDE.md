@@ -40,7 +40,7 @@ itself. Restarting the server invalidates every session, because
 `src/lib/access-token.ts` reads the token from disk on each check.
 
 **Services seam.** `src/lib/server/services.ts` is the backend's interface:
-`summary`, `sync`, `settings`, `updateSettings`. `createServices` takes
+`summary`, `work`, `sync`, `settings`, `updateSettings`. `createServices` takes
 `SyncDependencies` (`db`, `run`, `shortcut`, `now`), so tests pass an in-memory
 database and a fake `Runner`. `default-services.ts` wires the real ones and
 caches them on `globalThis`. Route handlers in `src/app/api` stay thin and call
@@ -56,6 +56,8 @@ caches them on `globalThis`. Route handlers in `src/app/api` stay thin and call
   names repos whose reviews the allow-list dropped; those events are never
   stored.
 - GitHub sync is skipped while the allow-list is empty.
+- Merged PRs come from a paged GraphQL search (`src/lib/github/search.ts`),
+  because `gh search prs` can't return PR size.
 - All remote access goes through `Runner` (`src/lib/exec.ts`): `gh` for GitHub
   and `short api` for Shortcut. `short` comes from `node_modules/.bin`, so start
   the server through `bun run`. The CLI uses its own `short install` credentials
@@ -69,19 +71,28 @@ on `(source, kind, external_id)`, so `upsertEvents` is idempotent and re-syncing
 overlapping windows is safe. `settings` is key/value. `snapshots` holds
 point-in-time counts (open PRs, requested reviews, stories in progress) that
 have no history. `open_items` holds the current open PRs and assigned stories,
-replaced per source on each successful fetch.
+replaced per source on each successful fetch. `draft_items` flags the open items
+that are drafts. `work_details` holds PR size, ticket points and type, and start
+times for completed work, keyed on `(source, external_id)`. New data that needs
+a new column goes in a new table, because `CREATE TABLE IF NOT EXISTS` can't
+alter an existing one.
 
 **Metrics.** `src/lib/metrics/summary.ts` `summarize` is a pure function of
 events, snapshots, settings, range and `now`. Nothing derived is stored. The
 allow-list is applied again here, so removing an entry hides already-synced
 events. Day and week boundaries come from `buckets.ts` using the configured time
-zone and week start.
+zone and week start. `src/lib/metrics/work.ts` `workReport` does the same for
+the work log, over any date range and not limited to the sync window. It leaves
+missing details out of totals rather than counting them as zero. Current drafts
+are listed whatever the range, because `open_items` has no history.
 
 **Frontend.** Pages are thin; logic lives in `src/components`. Components take
 optional `api` (`TallyApi`, `src/components/api.ts`) and `now` props that
 default to the real implementations, and `src/test/fake-api.ts` provides the
-test double. `use-dashboard.ts` owns dashboard state and triggers one automatic
-sync per load when data is older than 10 minutes.
+test double. `/work` renders `src/components/work/work-log.tsx`, which exports
+Markdown from `src/lib/metrics/work-markdown.ts`. `use-dashboard.ts` owns
+dashboard state and triggers one automatic sync per load when data is older than
+10 minutes.
 
 ## Conventions
 

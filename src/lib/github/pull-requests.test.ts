@@ -17,20 +17,39 @@ function recordingRunner(output: unknown) {
 }
 
 describe("fetchMergedPrs", () => {
-  it("searches my merged PRs since the date and maps closedAt to the merge time", async () => {
-    const { run, calls } = recordingRunner([
-      {
-        number: 4,
-        title: "Ship it",
-        url: "https://github.com/acme/api/pull/4",
-        closedAt: "2026-10-27T16:00:00Z",
-        repository: { nameWithOwner: "acme/api" },
+  const MERGED_PAGE = {
+    data: {
+      search: {
+        pageInfo: { hasNextPage: false, endCursor: null },
+        nodes: [
+          {
+            title: "Ship it",
+            url: "https://github.com/acme/api/pull/4",
+            createdAt: "2026-10-25T16:00:00Z",
+            mergedAt: "2026-10-27T16:00:00Z",
+            additions: 120,
+            deletions: 30,
+            changedFiles: 4,
+            repository: { nameWithOwner: "acme/api" },
+          },
+        ],
       },
-    ]);
+    },
+  };
 
-    const events = await fetchMergedPrs(run, "2026-09-01");
+  function fakeGitHub() {
+    const calls: string[][] = [];
+    const run: Runner = async (_command, args) => {
+      calls.push(args);
+      return args[1] === "user" ? "jorden-parker\n" : JSON.stringify(MERGED_PAGE);
+    };
+    return { run, calls };
+  }
 
-    expect(events).toEqual([
+  it("maps my merged PRs with their size and opening time", async () => {
+    const { run } = fakeGitHub();
+
+    expect(await fetchMergedPrs(run, "2026-09-01")).toEqual([
       {
         source: "github",
         kind: "pr_merged",
@@ -39,12 +58,22 @@ describe("fetchMergedPrs", () => {
         repo: "acme/api",
         title: "Ship it",
         url: "https://github.com/acme/api/pull/4",
+        startedAt: "2026-10-25T16:00:00Z",
+        points: null,
+        storyType: null,
+        additions: 120,
+        deletions: 30,
+        changedFiles: 4,
       },
     ]);
-    expect(calls[0]).toEqual(
-      expect.arrayContaining(["gh", "search", "prs", "--author", "@me", "--merged"]),
-    );
-    expect(calls[0]).toEqual(expect.arrayContaining(["--merged-at", ">=2026-09-01"]));
+  });
+
+  it("searches merged PRs by my login since the date", async () => {
+    const { run, calls } = fakeGitHub();
+
+    await fetchMergedPrs(run, "2026-09-01");
+
+    expect(calls[1]).toContain("search=is:pr author:jorden-parker is:merged merged:>=2026-09-01");
   });
 });
 
@@ -83,6 +112,7 @@ describe("fetchOpenAuthoredPrs", () => {
         title: "Tidy the proxy",
         url: "https://github.com/acme/api/pull/4",
         createdAt: "2026-10-20T08:00:00Z",
+        isDraft: false,
         repository: { nameWithOwner: "acme/api" },
       },
     ]);
@@ -92,6 +122,7 @@ describe("fetchOpenAuthoredPrs", () => {
         source: "github",
         externalId: "https://github.com/acme/api/pull/4",
         openedAt: "2026-10-20T08:00:00Z",
+        isDraft: false,
         repo: "acme/api",
         title: "Tidy the proxy",
         url: "https://github.com/acme/api/pull/4",
@@ -104,9 +135,28 @@ describe("fetchOpenAuthoredPrs", () => {
         "--state",
         "open",
         "--json",
-        "title,url,createdAt,repository",
+        "title,url,createdAt,isDraft,repository",
       ]),
     );
+  });
+});
+
+describe("fetchOpenAuthoredPrs", () => {
+  it("marks draft PRs and asks for the draft flag", async () => {
+    const { run, calls } = recordingRunner([
+      {
+        title: "Work in progress",
+        url: "https://github.com/acme/api/pull/8",
+        createdAt: "2026-10-28T08:00:00Z",
+        isDraft: true,
+        repository: { nameWithOwner: "acme/api" },
+      },
+    ]);
+
+    const [item] = await fetchOpenAuthoredPrs(run);
+
+    expect(item?.isDraft).toBe(true);
+    expect(calls[0]).toContain("title,url,createdAt,isDraft,repository");
   });
 });
 

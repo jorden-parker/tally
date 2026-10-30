@@ -19,6 +19,13 @@ describe("Dashboard", () => {
     expect(screen.getByText("Synced 5 minutes ago")).toBeDefined();
   });
 
+  it("links to the work log", async () => {
+    render(<Dashboard api={fakeApi()} now={now} />);
+
+    const link = await screen.findByRole("link", { name: "Work log" });
+    expect(link.getAttribute("href")).toBe("/work");
+  });
+
   it("loads the chosen range", async () => {
     const fetchSummary = vi.fn(async (range) => makeSummary({ range }));
     render(<Dashboard api={fakeApi({ fetchSummary })} now={now} />);

@@ -1,10 +1,14 @@
 import type { TallyApi } from "@/components/api";
-import type { DailyPoint, Summary } from "@/lib/metrics/summary";
+import type { DailyPoint, DayRange, Summary } from "@/lib/metrics/summary";
+import type { WorkReport, WorkRow } from "@/lib/metrics/work";
 import type { TallyEvent } from "@/lib/store/events";
 import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings } from "@/lib/store/settings";
 
 export const FIXED_NOW = new Date("2026-10-30T12:00:00Z");
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WORK_PERIOD = { from: "2026-10-01", to: "2026-10-30" };
 
 export function makeEvent(kind: TallyEvent["kind"], title: string, repo = "acme/api"): TallyEvent {
   return {
@@ -27,6 +31,7 @@ function makeOpenItem(
     source,
     externalId: title,
     openedAt: "2026-10-20T10:00:00Z",
+    isDraft: false,
     repo,
     title,
     url: `https://example.test/${encodeURIComponent(title)}`,
@@ -62,6 +67,43 @@ export function makeSummary(overrides: Partial<Summary> = {}): Summary {
   };
 }
 
+export function makeWorkRow(kind: "pr_merged" | "story_completed", title: string): WorkRow {
+  const isPullRequest = kind === "pr_merged";
+  return {
+    ...makeEvent(kind, title),
+    day: "2026-10-29",
+    startedAt: "2026-10-27T10:00:00Z",
+    points: isPullRequest ? null : 3,
+    storyType: isPullRequest ? null : "feature",
+    additions: isPullRequest ? 120 : null,
+    deletions: isPullRequest ? 30 : null,
+    changedFiles: isPullRequest ? 4 : null,
+  };
+}
+
+export function makeWorkReport(period: DayRange = WORK_PERIOD): WorkReport {
+  const draft = makeOpenItem("github", "Tidy the proxy", "acme/api");
+  return {
+    ...period,
+    totals: {
+      prsMerged: 1,
+      additions: 120,
+      deletions: 30,
+      changedFiles: 4,
+      prsWithoutSize: 0,
+      ticketsCompleted: 1,
+      points: 3,
+      unestimatedTickets: 0,
+      ticketsByType: [{ key: "feature", count: 1 }],
+      medianPrCycleMs: 2 * DAY_MS,
+      medianTicketCycleMs: 2 * DAY_MS,
+    },
+    prs: [makeWorkRow("pr_merged", "Ship it")],
+    tickets: [makeWorkRow("story_completed", "Ship tally")],
+    drafts: [{ ...draft, isDraft: true, day: "2026-10-20" }],
+  };
+}
+
 export function makeSettings(overrides: Partial<Settings> = {}): Settings {
   return {
     allowList: ["acme"],
@@ -75,6 +117,7 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
 export function fakeApi(overrides: Partial<TallyApi> = {}): TallyApi {
   return {
     fetchSummary: async (range) => makeSummary({ range }),
+    fetchWork: async (period) => makeWorkReport(period),
     fetchSettings: async () => makeSettings(),
     runSync: async () => ({ errors: {}, uncountedReviewRepos: [] }),
     saveSettings: async () => makeSettings(),

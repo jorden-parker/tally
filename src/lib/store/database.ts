@@ -24,6 +24,22 @@ const SCHEMA = `
     url TEXT NOT NULL,
     PRIMARY KEY (source, external_id)
   );
+  CREATE TABLE IF NOT EXISTS draft_items (
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    PRIMARY KEY (source, external_id)
+  );
+  CREATE TABLE IF NOT EXISTS work_details (
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    started_at TEXT,
+    points REAL,
+    story_type TEXT,
+    additions INTEGER,
+    deletions INTEGER,
+    changed_files INTEGER,
+    PRIMARY KEY (source, external_id)
+  );
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

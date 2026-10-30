@@ -46,19 +46,19 @@ export type SummaryInput = {
   now: Date;
 };
 
-type DayRange = { from: string; to: string };
+export type DayRange = { from: string; to: string };
 
 type DatedEvent = { event: TallyEvent; day: string };
 
 const DAILY_POINTS = 28;
 
-function allowedEvents(events: TallyEvent[], allowList: string[]): TallyEvent[] {
+export function allowedEvents<T extends TallyEvent>(events: T[], allowList: string[]): T[] {
   const github = events.filter((event) => event.source === "github");
   const others = events.filter((event) => event.source !== "github");
   return [...filterToAllowList(github, allowList), ...others];
 }
 
-function openWork(items: OpenItem[], allowList: string[]): Summary["open"] {
+export function openWork(items: OpenItem[], allowList: string[]): Summary["open"] {
   return {
     prs: filterToAllowList(
       items.filter((item) => item.source === "github"),

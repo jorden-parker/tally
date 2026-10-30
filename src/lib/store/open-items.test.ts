@@ -8,6 +8,7 @@ function pullRequest(overrides: Partial<OpenItem> = {}): OpenItem {
     source: "github",
     externalId: "https://github.com/acme/api/pull/1",
     openedAt: "2026-10-20T10:00:00Z",
+    isDraft: false,
     repo: "acme/api",
     title: "Add retries",
     url: "https://github.com/acme/api/pull/1",
@@ -20,6 +21,7 @@ function story(overrides: Partial<OpenItem> = {}): OpenItem {
     source: "shortcut",
     externalId: "31",
     openedAt: "2026-10-10T09:00:00Z",
+    isDraft: false,
     repo: null,
     title: "Plan the rollout",
     url: "https://app.shortcut.com/acme/story/31",
@@ -63,6 +65,27 @@ describe("open items store", () => {
     replaceOpenItems(db, "github", []);
 
     expect(loadOpenItems(db)).toEqual([story()]);
+  });
+
+  it("round-trips a draft PR", () => {
+    const draft = pullRequest({ isDraft: true });
+    replaceOpenItems(db, "github", [draft]);
+
+    expect(loadOpenItems(db)).toEqual([draft]);
+  });
+
+  it("clears the draft flag once a PR is marked ready for review", () => {
+    replaceOpenItems(db, "github", [pullRequest({ isDraft: true })]);
+    replaceOpenItems(db, "github", [pullRequest()]);
+
+    expect(loadOpenItems(db).map((item) => item.isDraft)).toEqual([false]);
+  });
+
+  it("keeps GitHub drafts when Shortcut items are replaced", () => {
+    replaceOpenItems(db, "github", [pullRequest({ isDraft: true })]);
+    replaceOpenItems(db, "shortcut", []);
+
+    expect(loadOpenItems(db).map((item) => item.isDraft)).toEqual([true]);
   });
 
   it("clears a source when replaced with an empty list", () => {
