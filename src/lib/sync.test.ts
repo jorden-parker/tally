@@ -4,6 +4,7 @@ import type { Runner } from "@/lib/exec";
 import type { ShortcutGet } from "@/lib/shortcut/client";
 import { openDatabase } from "@/lib/store/database";
 import { eventsBetween } from "@/lib/store/events";
+import { loadOpenItems } from "@/lib/store/open-items";
 import { loadSettings, loadSnapshots, saveSettings } from "@/lib/store/settings";
 import { syncAll } from "./sync";
 
@@ -55,11 +56,20 @@ function fakeGitHub(): { run: Runner; calls: string[][] } {
       ]);
     }
     return JSON.stringify([
-      { repository: { nameWithOwner: "acme/api" } },
-      { repository: { nameWithOwner: "acme/web" } },
+      { ...pullRequest("acme/api", 5), createdAt: "2026-10-20T08:00:00Z" },
+      { ...pullRequest("acme/web", 6), createdAt: "2026-10-22T08:00:00Z" },
+      { ...pullRequest("stranger/lib", 7), createdAt: "2026-10-23T08:00:00Z" },
     ]);
   };
   return { run, calls };
+}
+
+function withOpenAuthoredPrs(openPrs: unknown[]): Runner {
+  const { run } = fakeGitHub();
+  return async (command, args) =>
+    args.join(" ").includes("--author @me --state open")
+      ? JSON.stringify(openPrs)
+      : run(command, args);
 }
 
 const fakeShortcut: ShortcutGet = async <T>(path: string) => {
@@ -94,6 +104,12 @@ describe("syncAll", () => {
     return eventsBetween(db, "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z");
   }
 
+  function storedOpenPrUrls() {
+    return loadOpenItems(db)
+      .filter((item) => item.source === "github")
+      .map((item) => item.externalId);
+  }
+
   it("stores allowed events from both sources, the snapshots and the sync time", async () => {
     const { run } = fakeGitHub();
 
@@ -112,6 +128,46 @@ describe("syncAll", () => {
       storiesInProgress: 3,
     });
     expect(loadSettings(db).lastSyncedAt).toBe(NOW.toISOString());
+  });
+
+  it("stores my open PRs from allowed repos only, newest first", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(storedOpenPrUrls()).toEqual([
+      "https://github.com/acme/web/pull/6",
+      "https://github.com/acme/api/pull/5",
+    ]);
+  });
+
+  it("drops an open PR that is no longer returned on the next sync", async () => {
+    const first = fakeGitHub().run;
+    await syncAll({ db, run: first, shortcut: fakeShortcut, now: () => NOW });
+
+    const second = withOpenAuthoredPrs([
+      { ...pullRequest("acme/api", 5), createdAt: "2026-10-20T08:00:00Z" },
+    ]);
+    await syncAll({ db, run: second, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(storedOpenPrUrls()).toEqual(["https://github.com/acme/api/pull/5"]);
+  });
+
+  it("keeps the stored open PRs when the open-PR search fails", async () => {
+    const healthy = fakeGitHub().run;
+    await syncAll({ db, run: healthy, shortcut: fakeShortcut, now: () => NOW });
+
+    const failing: Runner = async (command, args) => {
+      if (args.join(" ").includes("--author @me --state open")) throw new Error("search failed");
+      return healthy(command, args);
+    };
+    const result = await syncAll({ db, run: failing, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(result.errors.github).toBe("search failed");
+    expect(storedOpenPrUrls()).toEqual([
+      "https://github.com/acme/web/pull/6",
+      "https://github.com/acme/api/pull/5",
+    ]);
   });
 
   it("asks GitHub for the last 60 days", async () => {

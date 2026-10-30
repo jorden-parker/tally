@@ -15,6 +15,15 @@ const SCHEMA = `
     PRIMARY KEY (source, kind, external_id)
   );
   CREATE INDEX IF NOT EXISTS events_occurred_at ON events (occurred_at);
+  CREATE TABLE IF NOT EXISTS open_items (
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    opened_at TEXT NOT NULL,
+    repo TEXT,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    PRIMARY KEY (source, external_id)
+  );
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

@@ -1,5 +1,6 @@
 import type { Runner } from "@/lib/exec";
 import type { TallyEvent } from "@/lib/store/events";
+import type { OpenItem } from "@/lib/store/open-items";
 
 type SearchedPullRequest = {
   title: string;
@@ -9,14 +10,7 @@ type SearchedPullRequest = {
   repository: { nameWithOwner: string };
 };
 
-export type OpenScope = "authored" | "review-requested";
-
 const SEARCH_LIMIT = "100";
-
-const SCOPE_FILTERS: Record<OpenScope, string[]> = {
-  authored: ["--author", "@me"],
-  "review-requested": ["--review-requested", "@me"],
-};
 
 async function searchPullRequests<T>(run: Runner, filters: string[], fields: string): Promise<T[]> {
   const output = await run("gh", [
@@ -65,10 +59,26 @@ export async function fetchCreatedPrs(run: Runner, sinceDate: string): Promise<T
   return created.map((pullRequest) => toEvent("pr_created", pullRequest, pullRequest.createdAt));
 }
 
-export async function fetchOpenPrRepos(run: Runner, scope: OpenScope): Promise<string[]> {
+export async function fetchOpenAuthoredPrs(run: Runner): Promise<OpenItem[]> {
+  const open = await searchPullRequests<SearchedPullRequest>(
+    run,
+    ["--author", "@me", "--state", "open"],
+    "title,url,createdAt,repository",
+  );
+  return open.map((pullRequest) => ({
+    source: "github",
+    externalId: pullRequest.url,
+    openedAt: pullRequest.createdAt,
+    repo: pullRequest.repository.nameWithOwner,
+    title: pullRequest.title,
+    url: pullRequest.url,
+  }));
+}
+
+export async function fetchReviewRequestedRepos(run: Runner): Promise<string[]> {
   const open = await searchPullRequests<Pick<SearchedPullRequest, "repository">>(
     run,
-    [...SCOPE_FILTERS[scope], "--state", "open"],
+    ["--review-requested", "@me", "--state", "open"],
     "repository",
   );
   return open.map((pullRequest) => pullRequest.repository.nameWithOwner);

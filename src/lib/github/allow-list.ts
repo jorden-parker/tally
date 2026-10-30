@@ -8,8 +8,11 @@ export function isAllowed(repo: string, allowList: string[]): boolean {
   });
 }
 
-export function filterToAllowList(events: TallyEvent[], allowList: string[]): TallyEvent[] {
-  return events.filter((event) => event.repo !== null && isAllowed(event.repo, allowList));
+export function filterToAllowList<T extends { repo: string | null }>(
+  items: T[],
+  allowList: string[],
+): T[] {
+  return items.filter((item) => item.repo !== null && isAllowed(item.repo, allowList));
 }
 
 export function uncountedRepos(events: TallyEvent[], allowList: string[]): string[] {

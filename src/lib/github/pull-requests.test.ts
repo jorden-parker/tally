@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Runner } from "@/lib/exec";
-import { fetchCreatedPrs, fetchMergedPrs, fetchOpenPrRepos } from "./pull-requests";
+import {
+  fetchCreatedPrs,
+  fetchMergedPrs,
+  fetchOpenAuthoredPrs,
+  fetchReviewRequestedRepos,
+} from "./pull-requests";
 
 function recordingRunner(output: unknown) {
   const calls: string[][] = [];
@@ -71,23 +76,47 @@ describe("fetchCreatedPrs", () => {
   });
 });
 
-describe("fetchOpenPrRepos", () => {
-  it("lists repos of my open authored PRs", async () => {
+describe("fetchOpenAuthoredPrs", () => {
+  it("maps my open PRs to open items and searches with the open-state filters", async () => {
     const { run, calls } = recordingRunner([
-      { repository: { nameWithOwner: "acme/api" } },
-      { repository: { nameWithOwner: "acme/web" } },
+      {
+        title: "Tidy the proxy",
+        url: "https://github.com/acme/api/pull/4",
+        createdAt: "2026-10-20T08:00:00Z",
+        repository: { nameWithOwner: "acme/api" },
+      },
     ]);
 
-    expect(await fetchOpenPrRepos(run, "authored")).toEqual(["acme/api", "acme/web"]);
+    expect(await fetchOpenAuthoredPrs(run)).toEqual([
+      {
+        source: "github",
+        externalId: "https://github.com/acme/api/pull/4",
+        openedAt: "2026-10-20T08:00:00Z",
+        repo: "acme/api",
+        title: "Tidy the proxy",
+        url: "https://github.com/acme/api/pull/4",
+      },
+    ]);
     expect(calls[0]).toEqual(
-      expect.arrayContaining(["--author", "@me", "--state", "open", "--json", "repository"]),
+      expect.arrayContaining([
+        "--author",
+        "@me",
+        "--state",
+        "open",
+        "--json",
+        "title,url,createdAt,repository",
+      ]),
     );
   });
+});
 
+describe("fetchReviewRequestedRepos", () => {
   it("lists repos of PRs awaiting my review", async () => {
     const { run, calls } = recordingRunner([{ repository: { nameWithOwner: "acme/api" } }]);
 
-    expect(await fetchOpenPrRepos(run, "review-requested")).toEqual(["acme/api"]);
-    expect(calls[0]).toEqual(expect.arrayContaining(["--review-requested", "@me"]));
+    expect(await fetchReviewRequestedRepos(run)).toEqual(["acme/api"]);
+    expect(calls[0]).toEqual(
+      expect.arrayContaining(["--review-requested", "@me", "--state", "open"]),
+    );
   });
 });

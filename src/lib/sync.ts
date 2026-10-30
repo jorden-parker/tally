@@ -1,7 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Runner } from "@/lib/exec";
 import { filterToAllowList, isAllowed, uncountedRepos } from "@/lib/github/allow-list";
-import { fetchCreatedPrs, fetchMergedPrs, fetchOpenPrRepos } from "@/lib/github/pull-requests";
+import {
+  fetchCreatedPrs,
+  fetchMergedPrs,
+  fetchOpenAuthoredPrs,
+  fetchReviewRequestedRepos,
+} from "@/lib/github/pull-requests";
 import { fetchReviewedPrs } from "@/lib/github/reviews";
 import type { ShortcutGet } from "@/lib/shortcut/client";
 import {
@@ -10,6 +15,7 @@ import {
   fetchMentionName,
 } from "@/lib/shortcut/stories";
 import { upsertEvents, type EventSource } from "@/lib/store/events";
+import { replaceOpenItems } from "@/lib/store/open-items";
 import { loadSettings, recordSnapshots, saveSettings } from "@/lib/store/settings";
 
 export const SYNC_WINDOW_DAYS = 60;
@@ -55,10 +61,10 @@ async function syncGitHub(
     fetchReviewedPrs(run, sinceDate),
     fetchCreatedPrs(run, sinceDate),
     fetchMergedPrs(run, sinceDate),
-    fetchOpenPrRepos(run, "authored"),
-    fetchOpenPrRepos(run, "review-requested"),
+    fetchOpenAuthoredPrs(run),
+    fetchReviewRequestedRepos(run),
   ]);
-  const [reviewed, created, merged, authoredRepos, requestedRepos] = results;
+  const [reviewed, created, merged, openAuthored, requestedRepos] = results;
   const reviews = settledValue(reviewed, []);
   upsertEvents(
     db,
@@ -68,17 +74,14 @@ async function syncGitHub(
     ),
   );
   uncountedReviewRepos.push(...uncountedRepos(reviews, allowList));
-  const countAllowed = (repos: string[]) =>
-    repos.filter((repo) => isAllowed(repo, allowList)).length;
-  if (authoredRepos.status === "fulfilled") {
-    recordSnapshots(db, { openAuthoredPrs: countAllowed(authoredRepos.value) }, now.toISOString());
+  if (openAuthored.status === "fulfilled") {
+    const openPrs = filterToAllowList(openAuthored.value, allowList);
+    replaceOpenItems(db, "github", openPrs);
+    recordSnapshots(db, { openAuthoredPrs: openPrs.length }, now.toISOString());
   }
   if (requestedRepos.status === "fulfilled") {
-    recordSnapshots(
-      db,
-      { reviewRequestedPrs: countAllowed(requestedRepos.value) },
-      now.toISOString(),
-    );
+    const allowedRepos = requestedRepos.value.filter((repo) => isAllowed(repo, allowList));
+    recordSnapshots(db, { reviewRequestedPrs: allowedRepos.length }, now.toISOString());
   }
   const failure = results.find((result) => result.status === "rejected");
   if (failure) throw failure.reason;
