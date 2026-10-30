@@ -66,9 +66,10 @@ caches them on `globalThis`. Route handlers in `src/app/api` stay thin and call
 **Storage.** `src/lib/store/database.ts` holds the schema, applied with
 `CREATE TABLE IF NOT EXISTS` on open; there are no migrations. `events` is keyed
 on `(source, kind, external_id)`, so `upsertEvents` is idempotent and re-syncing
-overlapping windows is safe. `settings` is key/value. `snapshots` holds
-point-in-time counts (open PRs, requested reviews, stories in progress) that
-have no history.
+overlapping windows is safe. `settings` is key/value. `snapshots` holds point-
+in-time counts (open PRs, requested reviews, stories in progress) that have no
+history. `open_items` holds the current open PRs and assigned stories, replaced
+per source on each successful fetch.
 
 **Metrics.** `src/lib/metrics/summary.ts` `summarize` is a pure function of
 events, snapshots, settings, range and `now`. Nothing derived is stored. The

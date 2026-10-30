@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { summarize, type Range, type Summary } from "@/lib/metrics/summary";
 import { eventsBetween } from "@/lib/store/events";
+import { loadOpenItems } from "@/lib/store/open-items";
 import { loadSettings, loadSnapshots, saveSettings, type Settings } from "@/lib/store/settings";
 import { SYNC_WINDOW_DAYS, syncAll, type SyncDependencies, type SyncResult } from "@/lib/sync";
 
@@ -48,6 +49,7 @@ export function createServices(dependencies: SyncDependencies): Services {
       const to = new Date(current.getTime() + MILLISECONDS_PER_DAY);
       return summarize({
         events: eventsBetween(db, from.toISOString(), to.toISOString()),
+        openItems: loadOpenItems(db),
         snapshots: loadSnapshots(db),
         settings: loadSettings(db),
         range,

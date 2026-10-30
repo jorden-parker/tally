@@ -12,6 +12,7 @@ describe("Dashboard", () => {
 
     expect(await screen.findByRole("img", { name: "7 PRs reviewed" })).toBeDefined();
     expect(screen.getByRole("link", { name: "Add retries" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Tickets assigned to you" })).toBeDefined();
     expect(screen.getByRole("button", { name: "This week" }).getAttribute("aria-pressed")).toBe(
       "true",
     );

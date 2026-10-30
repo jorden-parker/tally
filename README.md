@@ -4,8 +4,9 @@ A personal productivity dashboard that runs on your own machine. Tally counts
 the pull requests you reviewed, created and merged, and the Shortcut stories you
 completed, then compares each period with the one before it.
 
-It also shows what is open right now: your open pull requests, reviews requested
-from you, and stories in progress.
+It also shows what is open right now: your open pull requests, which it lists in
+full, reviews requested from you, stories in progress, and every ticket assigned
+to you.
 
 ## Requirements
 

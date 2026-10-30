@@ -1,5 +1,6 @@
 import { filterToAllowList } from "@/lib/github/allow-list";
 import type { EventKind, TallyEvent } from "@/lib/store/events";
+import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings, Snapshots } from "@/lib/store/settings";
 import { dayKey, shiftDay, weekKey } from "./buckets";
 
@@ -32,11 +33,13 @@ export type Summary = {
     merged: TallyEvent[];
     completed: TallyEvent[];
   };
+  open: { prs: OpenItem[]; tickets: OpenItem[] };
   lastSyncedAt: string | null;
 };
 
 export type SummaryInput = {
   events: TallyEvent[];
+  openItems: OpenItem[];
   snapshots: Snapshots;
   settings: Settings;
   range: Range;
@@ -53,6 +56,16 @@ function allowedEvents(events: TallyEvent[], allowList: string[]): TallyEvent[] 
   const github = events.filter((event) => event.source === "github");
   const others = events.filter((event) => event.source !== "github");
   return [...filterToAllowList(github, allowList), ...others];
+}
+
+function openWork(items: OpenItem[], allowList: string[]): Summary["open"] {
+  return {
+    prs: filterToAllowList(
+      items.filter((item) => item.source === "github"),
+      allowList,
+    ),
+    tickets: items.filter((item) => item.source === "shortcut"),
+  };
 }
 
 function currentPeriod(input: SummaryInput, today: string): { current: DayRange; shift: number } {
@@ -127,6 +140,7 @@ export function summarize(input: SummaryInput): Summary {
     now: snapshots,
     daily: dailyPoints(dated, today),
     lists: lists(dated, current),
+    open: openWork(input.openItems, settings.allowList),
     lastSyncedAt: settings.lastSyncedAt,
   };
 }

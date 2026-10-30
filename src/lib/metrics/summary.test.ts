@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EventKind, TallyEvent } from "@/lib/store/events";
+import type { OpenItem } from "@/lib/store/open-items";
 import { DEFAULT_SETTINGS } from "@/lib/store/settings";
 import { summarize, type SummaryInput } from "./summary";
 
@@ -26,6 +27,7 @@ const EVENTS: TallyEvent[] = [
 function input(range: SummaryInput["range"]): SummaryInput {
   return {
     events: EVENTS,
+    openItems: [],
     snapshots: { openAuthoredPrs: 2, reviewRequestedPrs: 1, storiesInProgress: 3 },
     settings: { ...DEFAULT_SETTINGS, allowList: ["acme"], timeZone: "UTC", weekStart: 1 },
     range,
@@ -92,5 +94,63 @@ describe("summarize", () => {
     });
     expect(summary.lastSyncedAt).toBe("2026-10-30T11:00:00Z");
     expect(summary.range).toBe("day");
+  });
+});
+
+const OPEN_ITEMS: OpenItem[] = [
+  {
+    source: "github",
+    externalId: "https://github.com/acme/api/pull/9",
+    openedAt: "2026-10-20T10:00:00Z",
+    repo: "acme/api",
+    title: "Tidy the proxy",
+    url: "https://github.com/acme/api/pull/9",
+  },
+  {
+    source: "github",
+    externalId: "https://github.com/stranger/lib/pull/2",
+    openedAt: "2026-10-21T10:00:00Z",
+    repo: "stranger/lib",
+    title: "Elsewhere",
+    url: "https://github.com/stranger/lib/pull/2",
+  },
+  {
+    source: "shortcut",
+    externalId: "31",
+    openedAt: "2026-10-10T09:00:00Z",
+    repo: null,
+    title: "Plan the rollout",
+    url: "https://app.shortcut.com/acme/story/31",
+  },
+];
+
+describe("open work", () => {
+  it("splits open items into PRs and tickets, and drops PRs outside the allow-list", () => {
+    const summary = summarize({ ...input("day"), openItems: OPEN_ITEMS });
+
+    expect(summary.open.prs.map((item) => item.externalId)).toEqual([
+      "https://github.com/acme/api/pull/9",
+    ]);
+    expect(summary.open.tickets.map((item) => item.externalId)).toEqual(["31"]);
+  });
+
+  it("keeps tickets when the allow-list no longer covers any repo", () => {
+    const base = input("day");
+    const summary = summarize({
+      ...base,
+      openItems: OPEN_ITEMS,
+      settings: { ...base.settings, allowList: ["other"] },
+    });
+
+    expect(summary.open.prs).toEqual([]);
+    expect(summary.open.tickets).toHaveLength(1);
+  });
+
+  it("reports the same open work for every range", () => {
+    const withOpen = (range: SummaryInput["range"]) =>
+      summarize({ ...input(range), openItems: OPEN_ITEMS }).open;
+
+    expect(withOpen("week")).toEqual(withOpen("day"));
+    expect(withOpen("30d")).toEqual(withOpen("day"));
   });
 });

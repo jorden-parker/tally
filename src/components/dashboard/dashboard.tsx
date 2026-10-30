@@ -6,7 +6,7 @@ import type { Settings } from "@/lib/store/settings";
 import { api as realApi, type TallyApi } from "../api";
 import { DailyChart } from "./daily-chart";
 import { formatSynced } from "./format";
-import { ItemLists } from "./item-lists";
+import { ItemLists, OpenLists } from "./item-lists";
 import { StatLedger } from "./stat-ledger";
 import { useDashboard } from "./use-dashboard";
 
@@ -69,6 +69,7 @@ function Report({ summary }: { summary: Summary }) {
   return (
     <>
       <StatLedger summary={summary} />
+      <OpenLists open={summary.open} />
       <section aria-label="Daily activity" className="flex flex-col gap-3">
         <h2 className="font-semibold">Last four weeks</h2>
         <DailyChart points={summary.daily} />

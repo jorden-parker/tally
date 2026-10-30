@@ -1,7 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { OpenItem } from "@/lib/store/open-items";
 import { makeEvent, makeSummary } from "@/test/fake-api";
-import { ItemLists } from "./item-lists";
+import { ItemLists, OpenLists } from "./item-lists";
 
 function section(name: string): HTMLElement {
   return screen.getByRole("region", { name });
@@ -38,5 +39,44 @@ describe("ItemLists", () => {
 
     expect(within(section("PRs created")).getAllByRole("link")).toHaveLength(8);
     expect(within(section("PRs created")).getByText("and 3 more")).toBeDefined();
+  });
+});
+
+function openPr(number: number): OpenItem {
+  return {
+    source: "github",
+    externalId: `https://github.com/acme/api/pull/${number}`,
+    openedAt: "2026-10-20T10:00:00Z",
+    repo: "acme/api",
+    title: `PR ${number}`,
+    url: `https://github.com/acme/api/pull/${number}`,
+  };
+}
+
+describe("OpenLists", () => {
+  it("links each open PR and shows its repo", () => {
+    render(<OpenLists open={makeSummary().open} />);
+
+    const link = within(section("Your open PRs")).getByRole("link", { name: "Tidy the proxy" });
+    expect(link.getAttribute("href")).toBe("https://example.test/Tidy%20the%20proxy");
+    expect(within(section("Your open PRs")).getByText("acme/api")).toBeDefined();
+  });
+
+  it("shows every item of a long list, with no overflow note", () => {
+    const prs = Array.from({ length: 11 }, (_, index) => openPr(index + 1));
+
+    render(<OpenLists open={{ prs, tickets: [] }} />);
+
+    expect(within(section("Your open PRs")).getAllByRole("link")).toHaveLength(11);
+    expect(within(section("Your open PRs")).queryByText(/and \d+ more/)).toBeNull();
+  });
+
+  it("says when there are no open PRs or assigned tickets", () => {
+    render(<OpenLists open={{ prs: [], tickets: [] }} />);
+
+    expect(within(section("Your open PRs")).getByText("No open PRs")).toBeDefined();
+    expect(
+      within(section("Tickets assigned to you")).getByText("No tickets assigned to you"),
+    ).toBeDefined();
   });
 });

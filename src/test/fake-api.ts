@@ -1,6 +1,7 @@
 import type { TallyApi } from "@/components/api";
 import type { DailyPoint, Summary } from "@/lib/metrics/summary";
 import type { TallyEvent } from "@/lib/store/events";
+import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings } from "@/lib/store/settings";
 
 export const FIXED_NOW = new Date("2026-10-30T12:00:00Z");
@@ -12,6 +13,21 @@ export function makeEvent(kind: TallyEvent["kind"], title: string, repo = "acme/
     externalId: title,
     occurredAt: "2026-10-29T10:00:00Z",
     repo: kind === "story_completed" ? null : repo,
+    title,
+    url: `https://example.test/${encodeURIComponent(title)}`,
+  };
+}
+
+function makeOpenItem(
+  source: OpenItem["source"],
+  title: string,
+  repo: string | null = null,
+): OpenItem {
+  return {
+    source,
+    externalId: title,
+    openedAt: "2026-10-20T10:00:00Z",
+    repo,
     title,
     url: `https://example.test/${encodeURIComponent(title)}`,
   };
@@ -36,6 +52,10 @@ export function makeSummary(overrides: Partial<Summary> = {}): Summary {
       created: [makeEvent("pr_created", "Fix flaky test")],
       merged: [],
       completed: [makeEvent("story_completed", "Ship the tracker")],
+    },
+    open: {
+      prs: [makeOpenItem("github", "Tidy the proxy", "acme/api")],
+      tickets: [makeOpenItem("shortcut", "Plan the rollout")],
     },
     lastSyncedAt: "2026-10-30T11:55:00Z",
     ...overrides,

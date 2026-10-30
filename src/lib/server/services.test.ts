@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "@/lib/store/database";
 import { upsertEvents } from "@/lib/store/events";
+import { replaceOpenItems } from "@/lib/store/open-items";
 import { loadSettings, saveSettings } from "@/lib/store/settings";
 import { createServices, InvalidSettingsError, type Services } from "./services";
 import type { ShortcutGet } from "@/lib/shortcut/client";
@@ -47,6 +48,34 @@ describe("services", () => {
 
     expect(summary.current.created).toBe(1);
     expect(summary.range).toBe("day");
+  });
+
+  it("includes the stored open PRs and assigned tickets in the summary", () => {
+    replaceOpenItems(db, "github", [
+      {
+        source: "github",
+        externalId: "https://github.com/acme/api/pull/3",
+        openedAt: "2026-10-20T08:00:00Z",
+        repo: "acme/api",
+        title: "Add retries",
+        url: "https://github.com/acme/api/pull/3",
+      },
+    ]);
+    replaceOpenItems(db, "shortcut", [
+      {
+        source: "shortcut",
+        externalId: "31",
+        openedAt: "2026-10-10T09:00:00Z",
+        repo: null,
+        title: "Plan the rollout",
+        url: "https://app.shortcut.com/acme/story/31",
+      },
+    ]);
+
+    const summary = services(db).summary("day");
+
+    expect(summary.open.prs.map((item) => item.title)).toEqual(["Add retries"]);
+    expect(summary.open.tickets.map((item) => item.title)).toEqual(["Plan the rollout"]);
   });
 
   it("syncs through the sync module and stamps the time", async () => {

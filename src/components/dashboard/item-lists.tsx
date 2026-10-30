@@ -10,33 +10,45 @@ const SECTIONS: { title: string; key: keyof Summary["lists"] }[] = [
   { title: "Tickets completed", key: "completed" },
 ];
 
-function Item({ event }: { event: TallyEvent }) {
+type ListedItem = Pick<TallyEvent, "externalId" | "title" | "url" | "repo">;
+
+function Item({ item }: { item: ListedItem }) {
   return (
     <li className="flex flex-col">
       <a
-        href={event.url}
+        href={item.url}
         target="_blank"
         rel="noreferrer"
         className="font-medium underline-offset-4 hover:underline"
       >
-        {event.title}
+        {item.title}
       </a>
-      {event.repo ? <span className="text-sm text-ink-soft">{event.repo}</span> : null}
+      {item.repo ? <span className="text-sm text-ink-soft">{item.repo}</span> : null}
     </li>
   );
 }
 
-function Section({ title, events }: { title: string; events: TallyEvent[] }) {
-  const hidden = events.length - MAX_VISIBLE;
+function Section({
+  title,
+  items,
+  emptyText,
+  maxVisible,
+}: {
+  title: string;
+  items: ListedItem[];
+  emptyText: string;
+  maxVisible: number;
+}) {
+  const hidden = items.length - maxVisible;
   return (
     <section aria-label={title} className="flex flex-col gap-3">
       <h3 className="font-semibold">{title}</h3>
-      {events.length === 0 ? (
-        <p className="text-ink-soft">Nothing in this period yet</p>
+      {items.length === 0 ? (
+        <p className="text-ink-soft">{emptyText}</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {events.slice(0, MAX_VISIBLE).map((event) => (
-            <Item key={event.externalId} event={event} />
+          {items.slice(0, maxVisible).map((item) => (
+            <Item key={item.externalId} item={item} />
           ))}
         </ul>
       )}
@@ -49,8 +61,33 @@ export function ItemLists({ lists }: { lists: Summary["lists"] }) {
   return (
     <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
       {SECTIONS.map(({ title, key }) => (
-        <Section key={key} title={title} events={lists[key]} />
+        <Section
+          key={key}
+          title={title}
+          items={lists[key]}
+          emptyText="Nothing in this period yet"
+          maxVisible={MAX_VISIBLE}
+        />
       ))}
+    </div>
+  );
+}
+
+export function OpenLists({ open }: { open: Summary["open"] }) {
+  return (
+    <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+      <Section
+        title="Your open PRs"
+        items={open.prs}
+        emptyText="No open PRs"
+        maxVisible={open.prs.length}
+      />
+      <Section
+        title="Tickets assigned to you"
+        items={open.tickets}
+        emptyText="No tickets assigned to you"
+        maxVisible={open.tickets.length}
+      />
     </div>
   );
 }
