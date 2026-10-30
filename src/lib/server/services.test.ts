@@ -1,0 +1,85 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import type { DatabaseSync } from "node:sqlite";
+import { openDatabase } from "@/lib/store/database";
+import { upsertEvents } from "@/lib/store/events";
+import { loadSettings, saveSettings } from "@/lib/store/settings";
+import { createServices, InvalidSettingsError, type Services } from "./services";
+
+const NOW = new Date("2026-10-30T12:00:00Z");
+
+function services(db: DatabaseSync, hasShortcut = false): Services {
+  return createServices({
+    db,
+    run: async () => {
+      throw new Error("gh must not run in this test");
+    },
+    shortcut: hasShortcut ? async () => ({}) as never : null,
+    now: () => NOW,
+  });
+}
+
+describe("services", () => {
+  let db: DatabaseSync;
+
+  beforeEach(() => {
+    db = openDatabase(":memory:");
+    saveSettings(db, { allowList: ["acme"], timeZone: "UTC" });
+  });
+
+  it("summarises stored events with the saved settings", () => {
+    upsertEvents(db, [
+      {
+        source: "github",
+        kind: "pr_created",
+        externalId: "pr-1",
+        occurredAt: "2026-10-30T08:00:00Z",
+        repo: "acme/api",
+        title: "Add retries",
+        url: "pr-1",
+      },
+    ]);
+
+    const summary = services(db).summary("day");
+
+    expect(summary.current.created).toBe(1);
+    expect(summary.range).toBe("day");
+  });
+
+  it("reports whether a Shortcut token is configured", () => {
+    expect(services(db, false).settings().shortcutConfigured).toBe(false);
+    expect(services(db, true).settings().shortcutConfigured).toBe(true);
+  });
+
+  it("syncs through the sync module and stamps the time", async () => {
+    saveSettings(db, { allowList: [] });
+
+    const result = await services(db).sync();
+
+    expect(result.errors).toEqual({});
+    expect(loadSettings(db).lastSyncedAt).toBe(NOW.toISOString());
+  });
+
+  it("saves valid settings, trimming and dropping blank allow-list entries", () => {
+    const view = services(db).updateSettings({
+      allowList: [" acme ", "", "me/side-project"],
+      weekStart: 0,
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(view.allowList).toEqual(["acme", "me/side-project"]);
+    expect(loadSettings(db)).toMatchObject({
+      allowList: ["acme", "me/side-project"],
+      weekStart: 0,
+      timeZone: "America/Los_Angeles",
+    });
+  });
+
+  it.each([
+    ["a bad week start", { weekStart: 3 }],
+    ["an owner with a space", { allowList: ["not valid"] }],
+    ["an unknown time zone", { timeZone: "Mars/Olympus" }],
+    ["an unknown key", { lastSyncedAt: "2020-01-01T00:00:00Z" }],
+  ])("rejects %s", (_name, body) => {
+    expect(() => services(db).updateSettings(body)).toThrow(InvalidSettingsError);
+  });
+});

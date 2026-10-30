@@ -1,0 +1,12 @@
+node_modules
+.next
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store
+coverage
+.playwright-mcp
+.claude/settings.local.json
+.claude/worktrees/
+
+/plans/
+.env*.local
