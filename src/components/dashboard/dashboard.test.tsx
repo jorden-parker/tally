@@ -32,7 +32,7 @@ describe("Dashboard", () => {
   it("syncs on load when the data is stale, then reloads", async () => {
     const stale = makeSummary({ lastSyncedAt: "2026-10-30T09:00:00Z" });
     const fetchSummary = vi.fn(async () => stale);
-    const runSync = vi.fn(async () => ({ errors: {} }));
+    const runSync = vi.fn(async () => ({ errors: {}, uncountedReviewRepos: [] }));
     render(<Dashboard api={fakeApi({ fetchSummary, runSync })} now={now} />);
 
     await waitFor(() => expect(runSync).toHaveBeenCalledTimes(1));
@@ -40,7 +40,7 @@ describe("Dashboard", () => {
   });
 
   it("does not sync on load when the data is fresh", async () => {
-    const runSync = vi.fn(async () => ({ errors: {} }));
+    const runSync = vi.fn(async () => ({ errors: {}, uncountedReviewRepos: [] }));
     render(<Dashboard api={fakeApi({ runSync })} now={now} />);
     await screen.findByRole("img", { name: "7 PRs reviewed" });
 
@@ -48,7 +48,10 @@ describe("Dashboard", () => {
   });
 
   it("syncs on demand and reports which source failed", async () => {
-    const runSync = vi.fn(async () => ({ errors: { github: "gh exploded" } }));
+    const runSync = vi.fn(async () => ({
+      errors: { github: "gh exploded" },
+      uncountedReviewRepos: [],
+    }));
     render(<Dashboard api={fakeApi({ runSync })} now={now} />);
     await screen.findByRole("img", { name: "7 PRs reviewed" });
 
@@ -56,6 +59,16 @@ describe("Dashboard", () => {
 
     expect((await screen.findByRole("alert")).textContent).toContain("GitHub: gh exploded");
     expect(runSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("names repos whose reviews are not counted", async () => {
+    const runSync = vi.fn(async () => ({ errors: {}, uncountedReviewRepos: ["stranger/lib"] }));
+    render(<Dashboard api={fakeApi({ runSync })} now={now} />);
+    await screen.findByRole("img", { name: "7 PRs reviewed" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("stranger/lib");
   });
 
   it("asks for an allow-list before there is anything to count", async () => {

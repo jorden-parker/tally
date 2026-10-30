@@ -51,6 +51,10 @@ caches them on `globalThis`. Route handlers in `src/app/api` stay thin and call
 
 - GitHub and Shortcut run independently, and failures are captured per source in
   `SyncResult.errors`. `lastSyncedAt` only advances when both succeed.
+- Each GitHub call is settled separately, so one failure keeps the other calls'
+  data and is reported in `SyncResult.errors`. `SyncResult.uncountedReviewRepos`
+  names repos whose reviews the allow-list dropped; those events are never
+  stored.
 - GitHub sync is skipped while the allow-list is empty.
 - All remote access goes through `Runner` (`src/lib/exec.ts`): `gh` for GitHub
   and `short api` for Shortcut. `short` comes from `node_modules/.bin`, so start

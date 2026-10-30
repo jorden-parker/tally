@@ -19,6 +19,12 @@ function describeSyncErrors(errors: SyncResult["errors"]): string[] {
   );
 }
 
+function describeUncountedReviews(repos: string[]): string[] {
+  return repos.length === 0
+    ? []
+    : [`Reviews in ${repos.join(", ")} aren't counted. Add them in Settings to count them.`];
+}
+
 export function useDashboard(api: TallyApi, now: () => Date) {
   const [range, setRange] = useState<Range>("week");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -50,7 +56,10 @@ export function useDashboard(api: TallyApi, now: () => Date) {
     setSyncing(true);
     try {
       const result = await api.runSync();
-      setProblems(describeSyncErrors(result.errors));
+      setProblems([
+        ...describeSyncErrors(result.errors),
+        ...describeUncountedReviews(result.uncountedReviewRepos),
+      ]);
       setReloads((count) => count + 1);
     } catch (error) {
       setProblems([messageOf(error)]);

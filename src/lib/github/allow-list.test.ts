@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { TallyEvent } from "@/lib/store/events";
-import { filterToAllowList, isAllowed } from "./allow-list";
+import { filterToAllowList, isAllowed, uncountedRepos } from "./allow-list";
+
+const event = (repo: string | null): TallyEvent => ({
+  source: "github",
+  kind: "pr_created",
+  externalId: String(repo),
+  occurredAt: "2026-10-30T10:00:00Z",
+  repo,
+  title: "t",
+  url: "u",
+});
 
 describe("isAllowed", () => {
   it("allows every repo under a listed owner", () => {
@@ -27,19 +37,23 @@ describe("isAllowed", () => {
 });
 
 describe("filterToAllowList", () => {
-  const event = (repo: string | null): TallyEvent => ({
-    source: "github",
-    kind: "pr_created",
-    externalId: String(repo),
-    occurredAt: "2026-10-30T10:00:00Z",
-    repo,
-    title: "t",
-    url: "u",
-  });
-
   it("keeps only events in allowed repos", () => {
     const kept = filterToAllowList([event("acme/api"), event("other/api"), event(null)], ["acme"]);
 
     expect(kept.map((item) => item.repo)).toEqual(["acme/api"]);
+  });
+});
+
+describe("uncountedRepos", () => {
+  it("names each repo outside the allow-list once, sorted, skipping allowed and unknown repos", () => {
+    const events = [
+      event("stranger/lib"),
+      event("acme/api"),
+      event("zeta/tool"),
+      event("stranger/lib"),
+      event(null),
+    ];
+
+    expect(uncountedRepos(events, ["acme"])).toEqual(["stranger/lib", "zeta/tool"]);
   });
 });

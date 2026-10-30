@@ -56,7 +56,7 @@ export function fakeApi(overrides: Partial<TallyApi> = {}): TallyApi {
   return {
     fetchSummary: async (range) => makeSummary({ range }),
     fetchSettings: async () => makeSettings(),
-    runSync: async () => ({ errors: {} }),
+    runSync: async () => ({ errors: {}, uncountedReviewRepos: [] }),
     saveSettings: async () => makeSettings(),
     ...overrides,
   };

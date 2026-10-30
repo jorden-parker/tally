@@ -35,7 +35,9 @@ server starts.
 
 Then open **Settings** and add the GitHub owners or repositories to count, such
 as `acme` or `acme/api`. Tally only reads GitHub activity for entries on this
-list, so GitHub sync stays off until you add one.
+list, so GitHub sync stays off until you add one. If you reviewed PRs in a repo
+that is not on the list, the dashboard names that repo after each sync so you
+can add it.
 
 ### Shortcut
 

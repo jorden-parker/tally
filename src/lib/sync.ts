@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Runner } from "@/lib/exec";
-import { filterToAllowList, isAllowed } from "@/lib/github/allow-list";
+import { filterToAllowList, isAllowed, uncountedRepos } from "@/lib/github/allow-list";
 import { fetchCreatedPrs, fetchMergedPrs, fetchOpenPrRepos } from "@/lib/github/pull-requests";
 import { fetchReviewedPrs } from "@/lib/github/reviews";
 import type { ShortcutGet } from "@/lib/shortcut/client";
@@ -23,7 +23,10 @@ export type SyncDependencies = {
   now: () => Date;
 };
 
-export type SyncResult = { errors: Partial<Record<EventSource, string>> };
+export type SyncResult = {
+  errors: Partial<Record<EventSource, string>>;
+  uncountedReviewRepos: string[];
+};
 
 function daysFrom(date: Date, days: number): Date {
   return new Date(date.getTime() + days * MILLISECONDS_PER_DAY);
@@ -37,28 +40,48 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  return result.status === "fulfilled" ? result.value : fallback;
+}
+
 async function syncGitHub(
   { db, run }: SyncDependencies,
   allowList: string[],
+  uncountedReviewRepos: string[],
   now: Date,
 ): Promise<void> {
   const sinceDate = dayOf(daysFrom(now, -SYNC_WINDOW_DAYS));
-  const [reviewed, created, merged, authoredRepos, requestedRepos] = await Promise.all([
+  const results = await Promise.allSettled([
     fetchReviewedPrs(run, sinceDate),
     fetchCreatedPrs(run, sinceDate),
     fetchMergedPrs(run, sinceDate),
     fetchOpenPrRepos(run, "authored"),
     fetchOpenPrRepos(run, "review-requested"),
   ]);
-  upsertEvents(db, filterToAllowList([...reviewed, ...created, ...merged], allowList));
-  recordSnapshots(
+  const [reviewed, created, merged, authoredRepos, requestedRepos] = results;
+  const reviews = settledValue(reviewed, []);
+  upsertEvents(
     db,
-    {
-      openAuthoredPrs: authoredRepos.filter((repo) => isAllowed(repo, allowList)).length,
-      reviewRequestedPrs: requestedRepos.filter((repo) => isAllowed(repo, allowList)).length,
-    },
-    now.toISOString(),
+    filterToAllowList(
+      [...reviews, ...settledValue(created, []), ...settledValue(merged, [])],
+      allowList,
+    ),
   );
+  uncountedReviewRepos.push(...uncountedRepos(reviews, allowList));
+  const countAllowed = (repos: string[]) =>
+    repos.filter((repo) => isAllowed(repo, allowList)).length;
+  if (authoredRepos.status === "fulfilled") {
+    recordSnapshots(db, { openAuthoredPrs: countAllowed(authoredRepos.value) }, now.toISOString());
+  }
+  if (requestedRepos.status === "fulfilled") {
+    recordSnapshots(
+      db,
+      { reviewRequestedPrs: countAllowed(requestedRepos.value) },
+      now.toISOString(),
+    );
+  }
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure) throw failure.reason;
 }
 
 async function syncShortcut({ db }: SyncDependencies, get: ShortcutGet, now: Date): Promise<void> {
@@ -90,14 +113,17 @@ export async function syncAll(dependencies: SyncDependencies): Promise<SyncResul
   const now = dependencies.now();
   const { allowList } = loadSettings(db);
   const errors: SyncResult["errors"] = {};
+  const uncountedReviewRepos: string[] = [];
 
   await Promise.all([
     allowList.length > 0
-      ? capture(errors, "github", () => syncGitHub(dependencies, allowList, now))
+      ? capture(errors, "github", () =>
+          syncGitHub(dependencies, allowList, uncountedReviewRepos, now),
+        )
       : undefined,
     capture(errors, "shortcut", () => syncShortcut(dependencies, shortcut, now)),
   ]);
 
   if (Object.keys(errors).length === 0) saveSettings(db, { lastSyncedAt: now.toISOString() });
-  return { errors };
+  return { errors, uncountedReviewRepos };
 }

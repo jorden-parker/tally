@@ -165,4 +165,26 @@ describe("syncAll", () => {
     expect(storedEvents().map((event) => event.kind)).toEqual(["story_completed"]);
     expect(loadSettings(db).lastSyncedAt).toBeNull();
   });
+
+  it("keeps reviews when another GitHub call fails", async () => {
+    const { run: healthyGitHub } = fakeGitHub();
+    const run: Runner = async (command, args) => {
+      if (args.join(" ").includes("--merged")) throw new Error("merged search failed");
+      return healthyGitHub(command, args);
+    };
+
+    const result = await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(result.errors.github).toBe("merged search failed");
+    expect(storedEvents().map((event) => event.kind)).toContain("pr_reviewed");
+    expect(loadSettings(db).lastSyncedAt).toBeNull();
+  });
+
+  it("names repos whose reviews the allow-list dropped", async () => {
+    const { run } = fakeGitHub();
+
+    const result = await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(result.uncountedReviewRepos).toEqual(["stranger/lib"]);
+  });
 });
