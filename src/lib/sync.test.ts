@@ -75,6 +75,20 @@ function withOpenAuthoredPrs(openPrs: unknown[]): Runner {
 const fakeShortcut: ShortcutGet = async <T>(path: string) => {
   if (path.endsWith("/member")) return { mention_name: "jorden" } as T;
   const query = new URL(path, "https://api.app.shortcut.com").searchParams.get("query") ?? "";
+  if (query.includes("!is:archived")) {
+    return {
+      data: [
+        {
+          id: 31,
+          name: "Plan the rollout",
+          app_url: "https://app.shortcut.com/acme/story/31",
+          completed_at: null,
+          created_at: "2026-10-10T09:00:00Z",
+        },
+      ],
+      next: null,
+    } as T;
+  }
   return (
     query.includes("is:started")
       ? { data: [], next: null, total: 3 }
@@ -234,6 +248,40 @@ describe("syncAll", () => {
     expect(result.errors.github).toBe("merged search failed");
     expect(storedEvents().map((event) => event.kind)).toContain("pr_reviewed");
     expect(loadSettings(db).lastSyncedAt).toBeNull();
+  });
+
+  it("stores my assigned stories from Shortcut", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(loadOpenItems(db).filter((item) => item.source === "shortcut")).toEqual([
+      {
+        source: "shortcut",
+        externalId: "31",
+        openedAt: "2026-10-10T09:00:00Z",
+        repo: null,
+        title: "Plan the rollout",
+        url: "https://app.shortcut.com/acme/story/31",
+      },
+    ]);
+  });
+
+  it("keeps the open PRs and the stored stories when Shortcut fails", async () => {
+    const { run } = fakeGitHub();
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    const failingShortcut: ShortcutGet = async () => {
+      throw new Error("shortcut down");
+    };
+    const result = await syncAll({ db, run, shortcut: failingShortcut, now: () => NOW });
+
+    expect(result.errors.shortcut).toBe("shortcut down");
+    expect(storedOpenPrUrls()).toEqual([
+      "https://github.com/acme/web/pull/6",
+      "https://github.com/acme/api/pull/5",
+    ]);
+    expect(loadOpenItems(db).filter((item) => item.source === "shortcut")).toHaveLength(1);
   });
 
   it("names repos whose reviews the allow-list dropped", async () => {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ShortcutGet } from "./client";
-import { countInProgressStories, fetchCompletedStories, fetchMentionName } from "./stories";
+import {
+  countInProgressStories,
+  fetchAssignedStories,
+  fetchCompletedStories,
+  fetchMentionName,
+} from "./stories";
 
 function story(id: number, completedAt: string | null) {
   return {
@@ -8,6 +13,7 @@ function story(id: number, completedAt: string | null) {
     name: `Story ${id}`,
     app_url: `https://app.shortcut.com/acme/story/${id}`,
     completed_at: completedAt,
+    created_at: "2026-10-01T09:00:00Z",
   };
 }
 
@@ -77,5 +83,46 @@ describe("countInProgressStories", () => {
 
     expect(await countInProgressStories(get, "jorden")).toBe(4);
     expect(queryOf(paths[0])).toBe("owner:jorden is:started !is:done");
+  });
+});
+
+describe("fetchAssignedStories", () => {
+  it("searches my unfinished, unarchived stories and maps them to open items", async () => {
+    const paths: string[] = [];
+    const get: ShortcutGet = async <T>(path: string) => {
+      paths.push(path);
+      return { data: [story(31, null)], next: null } as T;
+    };
+
+    const items = await fetchAssignedStories(get, "jorden");
+
+    expect(queryOf(paths[0])).toBe("owner:jorden !is:done !is:archived");
+    expect(items).toEqual([
+      {
+        source: "shortcut",
+        externalId: "31",
+        openedAt: "2026-10-01T09:00:00Z",
+        repo: null,
+        title: "Story 31",
+        url: "https://app.shortcut.com/acme/story/31",
+      },
+    ]);
+  });
+
+  it("follows the next link so stories past the first page are included", async () => {
+    const paths: string[] = [];
+    const get: ShortcutGet = async <T>(path: string) => {
+      paths.push(path);
+      return (
+        paths.length === 1
+          ? { data: [story(1, null)], next: "/api/v3/search/stories?next=abc" }
+          : { data: [story(2, null)], next: null }
+      ) as T;
+    };
+
+    const items = await fetchAssignedStories(get, "jorden");
+
+    expect(paths[1]).toBe("/api/v3/search/stories?next=abc");
+    expect(items.map((item) => item.externalId)).toEqual(["1", "2"]);
   });
 });

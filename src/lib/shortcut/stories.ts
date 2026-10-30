@@ -1,4 +1,5 @@
 import type { TallyEvent } from "@/lib/store/events";
+import type { OpenItem } from "@/lib/store/open-items";
 import type { ShortcutGet } from "./client";
 
 export type DayWindow = { fromDay: string; toDay: string };
@@ -8,6 +9,7 @@ type Story = {
   name: string;
   app_url: string;
   completed_at: string | null;
+  created_at: string;
 };
 
 type StorySearchPage = {
@@ -71,4 +73,19 @@ export async function countInProgressStories(
 ): Promise<number> {
   const page = await get<StorySearchPage>(searchPath(`owner:${mentionName} is:started !is:done`));
   return page.total ?? page.data.length;
+}
+
+export async function fetchAssignedStories(
+  get: ShortcutGet,
+  mentionName: string,
+): Promise<OpenItem[]> {
+  const stories = await searchAllStories(get, `owner:${mentionName} !is:done !is:archived`);
+  return stories.map((story) => ({
+    source: "shortcut",
+    externalId: String(story.id),
+    openedAt: story.created_at,
+    repo: null,
+    title: story.name,
+    url: story.app_url,
+  }));
 }

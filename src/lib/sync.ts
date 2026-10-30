@@ -11,6 +11,7 @@ import { fetchReviewedPrs } from "@/lib/github/reviews";
 import type { ShortcutGet } from "@/lib/shortcut/client";
 import {
   countInProgressStories,
+  fetchAssignedStories,
   fetchCompletedStories,
   fetchMentionName,
 } from "@/lib/shortcut/stories";
@@ -97,6 +98,7 @@ async function syncShortcut({ db }: SyncDependencies, get: ShortcutGet, now: Dat
   upsertEvents(db, completed);
   const storiesInProgress = await countInProgressStories(get, mentionName);
   recordSnapshots(db, { storiesInProgress }, now.toISOString());
+  replaceOpenItems(db, "shortcut", await fetchAssignedStories(get, mentionName));
 }
 
 async function capture(
