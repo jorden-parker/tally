@@ -1,32 +1,50 @@
 import { describe, expect, it } from "vitest";
+import type { Runner } from "@/lib/exec";
 import { createShortcutGet } from "./client";
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status });
+function recordingRunner(output: unknown) {
+  const calls: { command: string; args: string[] }[] = [];
+  const run: Runner = async (command, args) => {
+    calls.push({ command, args });
+    return JSON.stringify(output);
+  };
+  return { run, calls };
 }
 
 describe("createShortcutGet", () => {
-  it("calls the API with the token header and parses the JSON body", async () => {
-    const requests: { url: string; token: string | null }[] = [];
-    const fakeFetch: typeof fetch = async (input, init) => {
-      requests.push({
-        url: String(input),
-        token: new Headers(init?.headers).get("Shortcut-Token"),
-      });
-      return jsonResponse({ mention_name: "jorden" });
-    };
+  it("runs short api for the path and parses the JSON output", async () => {
+    const { run, calls } = recordingRunner({ mention_name: "jorden" });
 
-    const get = createShortcutGet("secret", fakeFetch);
+    const result = await createShortcutGet(run)("/api/v3/member");
 
-    expect(await get("/api/v3/member")).toEqual({ mention_name: "jorden" });
-    expect(requests).toEqual([
-      { url: "https://api.app.shortcut.com/api/v3/member", token: "secret" },
+    expect(result).toEqual({ mention_name: "jorden" });
+    expect(calls).toEqual([{ command: "short", args: ["api", "/member"] }]);
+  });
+
+  it("passes each query parameter as a raw field, decoded", async () => {
+    const { run, calls } = recordingRunner({ data: [] });
+
+    await createShortcutGet(run)(
+      "/api/v3/search/stories?query=owner%3Ajorden%20is%3Adone&page_size=25&next=abc",
+    );
+
+    expect(calls[0].args).toEqual([
+      "api",
+      "/search/stories",
+      "-f",
+      "query=owner:jorden is:done",
+      "-f",
+      "page_size=25",
+      "-f",
+      "next=abc",
     ]);
   });
 
-  it("throws with the status when the API rejects the request", async () => {
-    const get = createShortcutGet("bad", async () => jsonResponse({ message: "nope" }, 401));
+  it("propagates a failing command", async () => {
+    const run: Runner = async () => {
+      throw new Error("short api failed");
+    };
 
-    await expect(get("/api/v3/member")).rejects.toThrow(/401/);
+    await expect(createShortcutGet(run)("/api/v3/member")).rejects.toThrow(/short api failed/);
   });
 });

@@ -18,7 +18,7 @@ export function createDefaultServices(): Services {
   return createServices({
     db: openDatabase(path.join(directory, "tally.db")),
     run: runCommand,
-    shortcut: token ? createShortcutGet(token) : null,
+    shortcut: token ? createShortcutGet(runCommand) : null,
     now: () => new Date(),
   });
 }

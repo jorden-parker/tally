@@ -1,15 +1,19 @@
+import type { Runner } from "@/lib/exec";
+
 export type ShortcutGet = <T>(path: string) => Promise<T>;
 
-const API_ORIGIN = "https://api.app.shortcut.com";
+const API_PREFIX = "/api/v3";
+const PLACEHOLDER_ORIGIN = "http://localhost";
 
-export function createShortcutGet(token: string, fetchImpl: typeof fetch = fetch): ShortcutGet {
+function rawFields(searchParams: URLSearchParams): string[] {
+  return [...searchParams].flatMap(([key, value]) => ["-f", `${key}=${value}`]);
+}
+
+export function createShortcutGet(run: Runner): ShortcutGet {
   return async <T>(path: string) => {
-    const response = await fetchImpl(`${API_ORIGIN}${path}`, {
-      headers: { "Shortcut-Token": token, Accept: "application/json" },
-    });
-    if (!response.ok) {
-      throw new Error(`Shortcut ${path} failed with status ${response.status}`);
-    }
-    return (await response.json()) as T;
+    const url = new URL(path, PLACEHOLDER_ORIGIN);
+    const apiPath = url.pathname.slice(API_PREFIX.length);
+    const output = await run("short", ["api", apiPath, ...rawFields(url.searchParams)]);
+    return JSON.parse(output) as T;
   };
 }

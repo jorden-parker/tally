@@ -16,9 +16,11 @@
     "format:check": "prettier --check .",
     "verify": "bash .claude/verify",
     "prepare": "husky",
-    "fallow": "fallow"
+    "fallow": "fallow",
+    "shortcut:whoami": "short api /member"
   },
   "dependencies": {
+    "@shortcut-cli/shortcut-cli": "^5.0.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
