@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isAccessToken } from "@/lib/access-token";
+import { isAccessToken, isSessionValue, sessionValue } from "@/lib/access-token";
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const ALLOWED_FETCH_SITES = new Set(["same-origin", "none"]);
-const TOKEN_COOKIE = "tally_token";
+const SESSION_COOKIE = "tally_session";
 const TOKEN_PARAM = "token";
 
 function hostName(host: string | null): string | null {
@@ -42,14 +42,18 @@ function isAllowedRequest(request: NextRequest): boolean {
   return isReadMethod(request.method) || isSameOriginJson(request);
 }
 
-function exchangeTokenForCookie(request: NextRequest, token: string): NextResponse {
+function exchangeTokenForCookie(request: NextRequest): NextResponse {
   const { pathname, searchParams } = request.nextUrl;
   searchParams.delete(TOKEN_PARAM);
   const query = searchParams.size > 0 ? `?${searchParams}` : "";
   const response = NextResponse.redirect(
     `http://${request.headers.get("host")}${pathname}${query}`,
   );
-  response.cookies.set(TOKEN_COOKIE, token, { httpOnly: true, sameSite: "strict", path: "/" });
+  response.cookies.set(SESSION_COOKIE, sessionValue() ?? "", {
+    httpOnly: true,
+    sameSite: "strict",
+    path: "/",
+  });
   return response;
 }
 
@@ -59,9 +63,9 @@ export function proxy(request: NextRequest) {
   }
   const urlToken = request.nextUrl.searchParams.get(TOKEN_PARAM);
   if (urlToken && isReadMethod(request.method) && isAccessToken(urlToken)) {
-    return exchangeTokenForCookie(request, urlToken);
+    return exchangeTokenForCookie(request);
   }
-  if (!isAccessToken(request.cookies.get(TOKEN_COOKIE)?.value)) {
+  if (!isSessionValue(request.cookies.get(SESSION_COOKIE)?.value)) {
     return new NextResponse("Unauthorized: open the URL printed when Tally started.", {
       status: 401,
     });

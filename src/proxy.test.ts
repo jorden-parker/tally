@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { issueAccessToken } from "./lib/access-token";
+import { issueAccessToken, sessionValue } from "./lib/access-token";
 import { proxy } from "./proxy";
 
 const API = "http://127.0.0.1:4488/api/sync";
@@ -15,7 +15,7 @@ let token: string;
 function requestFor(headers: Record<string, string>, method = "POST"): NextRequest {
   return new NextRequest(API, {
     method,
-    headers: { host: "127.0.0.1:4488", cookie: `tally_token=${token}`, ...headers },
+    headers: { host: "127.0.0.1:4488", cookie: `tally_session=${sessionValue()}`, ...headers },
   });
 }
 
@@ -58,13 +58,17 @@ describe("proxy", () => {
     expect(proxy(requestFor({ "sec-fetch-site": "same-origin" }, "GET")).status).toBe(200);
   });
 
-  it("refuses requests without the current access token cookie", () => {
+  it("refuses the master token presented as a cookie", () => {
+    expect(proxy(requestFor({ cookie: `tally_session=${token}` }, "GET")).status).toBe(401);
+  });
+
+  it("refuses requests without the current session cookie", () => {
     expect(proxy(requestFor({ cookie: "" }, "GET")).status).toBe(401);
-    expect(proxy(requestFor({ cookie: "tally_token=wrong" }, "GET")).status).toBe(401);
+    expect(proxy(requestFor({ cookie: "tally_session=wrong" }, "GET")).status).toBe(401);
     expect(proxy(requestFor({ ...SAME_ORIGIN_JSON, cookie: "" })).status).toBe(401);
   });
 
-  it("trades a valid token in the URL for a private cookie and strips it from the URL", () => {
+  it("trades a valid token in the URL for a session cookie and strips it from the URL", () => {
     const request = new NextRequest(`http://127.0.0.1:4488/?range=week&token=${token}`, {
       headers: { host: "127.0.0.1:4488", "sec-fetch-site": "none" },
     });
@@ -74,7 +78,8 @@ describe("proxy", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://127.0.0.1:4488/?range=week");
     const cookie = response.headers.get("set-cookie") ?? "";
-    expect(cookie).toContain(`tally_token=${token}`);
+    expect(cookie).toContain(`tally_session=${sessionValue()}`);
+    expect(cookie).not.toContain(token);
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toMatch(/SameSite=strict/i);
   });

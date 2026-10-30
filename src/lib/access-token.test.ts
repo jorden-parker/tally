@@ -2,7 +2,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { isAccessToken, issueAccessToken, readAccessToken } from "./access-token";
+import {
+  isAccessToken,
+  isSessionValue,
+  issueAccessToken,
+  readAccessToken,
+  sessionValue,
+} from "./access-token";
 
 describe("access token", () => {
   let directory: string;
@@ -39,5 +45,19 @@ describe("access token", () => {
     expect(isAccessToken("")).toBe(false);
     expect(isAccessToken(null)).toBe(false);
     expect(isAccessToken(undefined)).toBe(false);
+  });
+
+  it("derives a session value that is not the token and dies with it", () => {
+    const token = issueAccessToken();
+    const session = sessionValue();
+
+    expect(session).not.toBeNull();
+    expect(session).not.toBe(token);
+    expect(isSessionValue(session)).toBe(true);
+    expect(isSessionValue(token)).toBe(false);
+
+    issueAccessToken();
+
+    expect(isSessionValue(session)).toBe(false);
   });
 });

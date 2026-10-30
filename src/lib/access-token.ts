@@ -23,10 +23,22 @@ export function readAccessToken(): string | null {
   }
 }
 
-export function isAccessToken(candidate: string | null | undefined): boolean {
-  const expected = readAccessToken();
+function matches(candidate: string | null | undefined, expected: string | null): boolean {
   if (!expected || !candidate) return false;
   const given = Buffer.from(candidate);
   const wanted = Buffer.from(expected);
   return given.length === wanted.length && crypto.timingSafeEqual(given, wanted);
+}
+
+export function isAccessToken(candidate: string | null | undefined): boolean {
+  return matches(candidate, readAccessToken());
+}
+
+export function sessionValue(): string | null {
+  const token = readAccessToken();
+  return token && crypto.createHmac("sha256", token).update("tally-session").digest("base64url");
+}
+
+export function isSessionValue(candidate: string | null | undefined): boolean {
+  return matches(candidate, sessionValue());
 }
