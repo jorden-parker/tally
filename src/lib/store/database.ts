@@ -1,4 +1,7 @@
+import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+
+const IN_MEMORY = ":memory:";
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS events (
@@ -26,5 +29,8 @@ const SCHEMA = `
 export function openDatabase(location: string): DatabaseSync {
   const db = new DatabaseSync(location);
   db.exec(SCHEMA);
+  if (location !== IN_MEMORY) {
+    fs.chmodSync(location, 0o600);
+  }
   return db;
 }

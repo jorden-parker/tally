@@ -25,6 +25,22 @@ describe("createDefaultServices", () => {
     expect(fs.existsSync(path.join(directory, "nested", "tally.db"))).toBe(true);
   });
 
+  it("keeps the data directory and database private to the owner", () => {
+    createDefaultServices();
+
+    const mode = (target: string) => fs.statSync(target).mode & 0o777;
+    expect(mode(path.join(directory, "nested"))).toBe(0o700);
+    expect(mode(path.join(directory, "nested", "tally.db"))).toBe(0o600);
+  });
+
+  it("tightens an existing data directory that is open to others", () => {
+    fs.mkdirSync(path.join(directory, "nested"), { mode: 0o755 });
+
+    createDefaultServices();
+
+    expect(fs.statSync(path.join(directory, "nested")).mode & 0o777).toBe(0o700);
+  });
+
   it("enables Shortcut only when a token is set", () => {
     expect(createDefaultServices().settings().shortcutConfigured).toBe(false);
 
