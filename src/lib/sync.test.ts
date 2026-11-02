@@ -145,6 +145,20 @@ const ASSIGNED_STORY = shortcutStory(31, "Plan the rollout", {
       merged: false,
       closed: false,
     },
+    {
+      url: "https://github.com/acme/api/pull/4",
+      title: "Shipped",
+      draft: false,
+      merged: true,
+      closed: true,
+    },
+    {
+      url: "https://github.com/acme/api/pull/12",
+      title: "Someone else's",
+      draft: false,
+      merged: false,
+      closed: false,
+    },
   ],
 });
 
@@ -367,6 +381,7 @@ describe("syncAll", () => {
       completedAt: null,
       owners: ["Jorden"],
       pullRequests: [
+        { url: "https://github.com/acme/api/pull/4", title: "Shipped", isMerged: true },
         {
           url: "https://github.com/acme/api/pull/5",
           title: "Roll out",
@@ -374,7 +389,6 @@ describe("syncAll", () => {
           isMerged: false,
           reviewStatus: "approved",
         },
-        { url: "https://github.com/stranger/lib/pull/10" },
       ],
     });
     expect(loadOpenItems(db).every((item) => item.source === "github")).toBe(true);
@@ -410,10 +424,9 @@ describe("syncAll", () => {
       ],
     });
     expect(ticketById("31")?.pullRequests.map((pullRequest) => pullRequest.url)).toEqual([
+      "https://github.com/acme/api/pull/4",
       "https://github.com/acme/api/pull/5",
-      "https://github.com/stranger/lib/pull/10",
     ]);
-    expect(ticketById("31")?.pullRequests[1]?.reviewStatus).toBe("in_review");
     expect(
       loadTickets(db)
         .map((ticket) => ticket.id)

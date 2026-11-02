@@ -93,10 +93,20 @@ describe("TicketCards", () => {
 
     renderCards({ tickets });
 
-    const draft = within(card("1")).getByRole("link", { name: "Draft PR" });
+    const draft = within(card("1")).getByRole("link", { name: "Roll out" });
     expect(draft.getAttribute("href")).toBe("https://github.com/acme/api/pull/9");
-    expect(within(card("2")).getByRole("link", { name: "PR open" })).toBeDefined();
-    expect(within(card("3")).getByRole("link", { name: "PR merged" })).toBeDefined();
+    expect(draft.getAttribute("target")).toBe("_blank");
+    expect(within(card("1")).getByText("acme/api #9 · Draft PR")).toBeDefined();
+    expect(within(card("2")).getByText("acme/api #9 · PR open")).toBeDefined();
+    expect(within(card("3")).getByText("acme/api #9 · PR merged")).toBeDefined();
+  });
+
+  it("falls back to the url path when a PR is not on GitHub", () => {
+    renderCards({
+      tickets: [makeTicket({ pullRequests: [{ ...PULL_REQUEST, url: "https://x/pulls/2" }] })],
+    });
+
+    expect(within(card("31")).getByText("/pulls/2 · PR open")).toBeDefined();
   });
 
   it("labels my PRs with their review status", () => {
@@ -109,10 +119,10 @@ describe("TicketCards", () => {
       ],
     });
 
-    expect(within(card("1")).getByRole("link", { name: "Awaiting review" })).toBeDefined();
-    expect(within(card("2")).getByRole("link", { name: "In review" })).toBeDefined();
-    expect(within(card("3")).getByRole("link", { name: "Changes requested" })).toBeDefined();
-    expect(within(card("4")).getByRole("link", { name: "Approved" })).toBeDefined();
+    expect(within(card("1")).getByText("acme/api #9 · Awaiting review")).toBeDefined();
+    expect(within(card("2")).getByText("acme/api #9 · In review")).toBeDefined();
+    expect(within(card("3")).getByText("acme/api #9 · Changes requested")).toBeDefined();
+    expect(within(card("4")).getByText("acme/api #9 · Approved")).toBeDefined();
   });
 
   it("prefers the draft and merged labels over the review status", () => {
@@ -129,21 +139,25 @@ describe("TicketCards", () => {
       ],
     });
 
-    expect(within(card("1")).getByRole("link", { name: "Draft PR" })).toBeDefined();
-    expect(within(card("2")).getByRole("link", { name: "PR merged" })).toBeDefined();
+    expect(within(card("1")).getByText("acme/api #9 · Draft PR")).toBeDefined();
+    expect(within(card("2")).getByText("acme/api #9 · PR merged")).toBeDefined();
   });
 
   it("lists one line per PR when a ticket has several", () => {
     const tickets = [
       makeTicket({
-        pullRequests: [PULL_REQUEST, { ...PULL_REQUEST, url: "https://x/2", isMerged: true }],
+        pullRequests: [
+          PULL_REQUEST,
+          { ...PULL_REQUEST, url: "https://github.com/acme/web/pull/2", isMerged: true },
+        ],
       }),
     ];
 
     renderCards({ tickets });
 
-    expect(within(card("31")).getByRole("link", { name: "PR open" })).toBeDefined();
-    expect(within(card("31")).getByRole("link", { name: "PR merged" })).toBeDefined();
+    expect(within(card("31")).getAllByRole("link", { name: "Roll out" })).toHaveLength(2);
+    expect(within(card("31")).getByText("acme/api #9 · PR open")).toBeDefined();
+    expect(within(card("31")).getByText("acme/web #2 · PR merged")).toBeDefined();
   });
 
   it("leaves out the estimate and type when Shortcut has none", () => {
@@ -216,9 +230,9 @@ describe("TicketCards", () => {
 
       const region = section("Reviewing");
       expect(within(region).getAllByText("Owned by Ada, Grace")).toHaveLength(3);
-      expect(within(card("1")).getByRole("link", { name: "Awaiting your review" })).toBeDefined();
-      expect(within(card("2")).getByRole("link", { name: "You are reviewing" })).toBeDefined();
-      expect(within(card("3")).getByRole("link", { name: "You requested changes" })).toBeDefined();
+      expect(within(card("1")).getByText("acme/api #9 · Awaiting your review")).toBeDefined();
+      expect(within(card("2")).getByText("acme/api #9 · You are reviewing")).toBeDefined();
+      expect(within(card("3")).getByText("acme/api #9 · You requested changes")).toBeDefined();
     });
 
     it("says when nothing is waiting", () => {

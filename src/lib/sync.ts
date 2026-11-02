@@ -10,7 +10,7 @@ import {
 } from "@/lib/github/pull-requests";
 import { fetchReviewedPrs } from "@/lib/github/reviews";
 import type { ShortcutGet } from "@/lib/shortcut/client";
-import { linkPullRequests } from "@/lib/shortcut/link";
+import { linkPullRequests, type PullRequestsByRole } from "@/lib/shortcut/link";
 import {
   countInProgressStories,
   fetchAssignedStories,
@@ -47,11 +47,11 @@ export type SyncResult = {
   uncountedReviewRepos: string[];
 };
 
-type GitHubSync = { authored: ReviewablePullRequest[]; toReview: ReviewablePullRequest[] };
+type GitHubSync = PullRequestsByRole;
 
 type ShortcutSync = { assigned: Ticket[]; completed: Ticket[]; context: StoryContext };
 
-const NO_PULL_REQUESTS: GitHubSync = { authored: [], toReview: [] };
+const NO_PULL_REQUESTS: GitHubSync = { authored: [], toReview: [], mergedUrls: [] };
 
 function daysFrom(date: Date, days: number): Date {
   return new Date(date.getTime() + days * MILLISECONDS_PER_DAY);
@@ -104,6 +104,7 @@ async function syncGitHub(
   const pullRequests = {
     authored: settledValue(openAuthored, []),
     toReview: settledValue(toReview, []),
+    mergedUrls: settledValue(merged, []).map((pullRequest) => pullRequest.url),
   };
   replacePullRequestReviews(
     db,
@@ -156,12 +157,16 @@ function storyIdsToReview(toReview: ReviewablePullRequest[], known: Ticket[]): s
 async function storeTickets(
   { db, shortcut }: SyncDependencies,
   { assigned, completed, context }: ShortcutSync,
-  { authored, toReview }: GitHubSync,
+  github: GitHubSync,
 ): Promise<void> {
   const known = [...assigned, ...completed];
-  const reviewing = await fetchStoriesById(shortcut, storyIdsToReview(toReview, known), context);
+  const reviewing = await fetchStoriesById(
+    shortcut,
+    storyIdsToReview(github.toReview, known),
+    context,
+  );
   const tickets = [...assigned, ...reviewing, ...completed];
-  replaceTickets(db, linkPullRequests(tickets, [...authored, ...toReview]));
+  replaceTickets(db, linkPullRequests(tickets, github));
 }
 
 async function capture<T>(

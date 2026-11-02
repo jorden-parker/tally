@@ -43,6 +43,13 @@ function pullRequestStatus(pullRequest: TicketPullRequest, labels: StatusLabels)
   return pullRequest.reviewStatus === null ? "PR open" : labels[pullRequest.reviewStatus];
 }
 
+const GITHUB_PULL_REQUEST_URL = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)$/;
+
+function pullRequestReference(url: string): string {
+  const match = GITHUB_PULL_REQUEST_URL.exec(url);
+  return match ? `${match[1]} #${match[2]}` : new URL(url).pathname;
+}
+
 function completedText(completedAt: string): string {
   return `Completed ${formatLongDay(dayKey(completedAt, LOCAL_TIME_ZONE))}`;
 }
@@ -58,15 +65,18 @@ function PullRequestStatus({
   return (
     <ul className="flex flex-col gap-1 text-sm">
       {pullRequests.map((pullRequest) => (
-        <li key={pullRequest.url}>
+        <li key={pullRequest.url} className="flex flex-col">
           <a
             href={pullRequest.url}
             target="_blank"
             rel="noreferrer"
             className="underline-offset-4 hover:underline"
           >
-            {pullRequestStatus(pullRequest, labels)}
+            {pullRequest.title}
           </a>
+          <span className="text-ink-soft">
+            {pullRequestReference(pullRequest.url)} · {pullRequestStatus(pullRequest, labels)}
+          </span>
         </li>
       ))}
     </ul>
