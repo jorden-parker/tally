@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { FIXED_NOW, fakeApi, makeSettings, makeSummary } from "@/test/fake-api";
+import type { SyncResult } from "@/lib/sync";
 import { Dashboard } from "./dashboard";
 
 const now = () => FIXED_NOW;
@@ -97,6 +98,31 @@ describe("Dashboard", () => {
 
     const link = await screen.findByRole("link", { name: "Choose them in settings" });
     expect(link.getAttribute("href")).toBe("/settings");
+  });
+
+  it("shows a playful note while the summary loads", async () => {
+    render(<Dashboard api={fakeApi()} now={now} />);
+
+    expect(screen.getByText("Sharpening pencils…")).toBeDefined();
+    await screen.findByRole("img", { name: "7 PRs reviewed" });
+  });
+
+  it("says it is counting while a sync runs", async () => {
+    let finishSync: (result: SyncResult) => void = () => {};
+    const runSync = vi.fn(
+      () =>
+        new Promise<SyncResult>((resolve) => {
+          finishSync = resolve;
+        }),
+    );
+    render(<Dashboard api={fakeApi({ runSync })} now={now} />);
+    await screen.findByRole("img", { name: "7 PRs reviewed" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+
+    expect(screen.getByRole("button", { name: "Counting sheep…" })).toBeDefined();
+    finishSync({ errors: {}, uncountedReviewRepos: [] });
+    expect(await screen.findByRole("button", { name: "Sync now" })).toBeDefined();
   });
 
   it("shows why loading failed", async () => {

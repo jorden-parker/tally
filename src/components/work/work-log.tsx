@@ -23,7 +23,8 @@ import { useWorkLog } from "./use-work-log";
 
 const currentTime = () => new Date();
 
-const BUTTON_CLASS = "rounded-md border border-rule px-3 py-1.5 text-sm text-ink";
+const BUTTON_CLASS =
+  "sketch-border doodle-shadow bg-paper px-3 py-1.5 text-sm text-ink transition active:translate-x-[3px] active:translate-y-[3px] active:shadow-none";
 const SEPARATOR = " · ";
 
 type WorkLogProps = { api?: TallyApi; now?: () => Date };
@@ -44,7 +45,7 @@ function DateField({
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-md border border-rule bg-transparent px-2 py-1 text-ink"
+        className="sketch-border bg-paper px-2 py-1 text-ink"
       />
     </label>
   );
@@ -54,7 +55,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
       <dt className="text-sm text-ink-soft">{label}</dt>
-      <dd className="text-xl font-semibold">{value}</dd>
+      <dd className="font-hand text-4xl font-bold">{value}</dd>
     </div>
   );
 }
@@ -74,7 +75,7 @@ function TotalsBlock({
 }) {
   return (
     <div role="group" aria-label={title} className="flex flex-col gap-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">{title}</h3>
+      <h3 className="font-hand text-2xl font-bold text-ink-soft">{title}</h3>
       <dl className="grid grid-cols-3 gap-6">{children}</dl>
       {notes.map((note) => (
         <p key={note} className="text-sm text-ink-soft">
@@ -182,7 +183,7 @@ function RowSection({
 }) {
   return (
     <section aria-label={title} className="flex flex-col gap-4">
-      <h2 className="font-semibold">
+      <h2 className="font-hand text-3xl font-bold">
         {title} ({count})
       </h2>
       {count === 0 ? <p className="text-ink-soft">{emptyText}</p> : children}
@@ -245,20 +246,24 @@ function Report({ report }: { report: WorkReport }) {
       </p>
       <ExportActions report={report} />
       <Totals totals={report.totals} />
-      <RowSection title="PRs merged" count={report.prs.length} emptyText="Nothing in this period">
+      <RowSection
+        title="PRs merged"
+        count={report.prs.length}
+        emptyText="A quiet stretch. Nothing here."
+      >
         <DayGroups rows={report.prs} />
       </RowSection>
       <RowSection
         title="Tickets completed"
         count={report.tickets.length}
-        emptyText="Nothing in this period"
+        emptyText="A quiet stretch. Nothing here."
       >
         <DayGroups rows={report.tickets} />
       </RowSection>
       <RowSection
         title="Drafts in progress"
         count={report.drafts.length}
-        emptyText="No drafts in progress"
+        emptyText="No drafts on the go."
       >
         <ul className="flex flex-col gap-3">
           {report.drafts.map((row) => (
@@ -274,12 +279,12 @@ export function WorkLog({ api = realApi, now = currentTime }: WorkLogProps) {
   const { period, setPeriod, report, problem } = useWorkLog(api, now);
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-10">
+    <main className="mx-auto flex max-w-5xl flex-col gap-10 px-6 pt-10 pb-28">
       <Link href="/" className="text-sm text-ink-soft underline underline-offset-4">
         Back to dashboard
       </Link>
       <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Work log</h1>
+        <h1 className="highlighter px-1 font-hand text-5xl font-bold">Work log</h1>
         <div className="flex flex-wrap gap-3">
           <DateField
             label="From"
@@ -290,12 +295,14 @@ export function WorkLog({ api = realApi, now = currentTime }: WorkLogProps) {
         </div>
       </header>
       {problem === null ? null : (
-        <p role="alert" className="rounded-md border border-rule p-4">
+        <p role="alert" className="max-w-2xl -rotate-1 rounded-sm bg-sticky-bug p-4 doodle-shadow">
           {problem}
         </p>
       )}
       {report ? <Report report={report} /> : null}
-      {report === null && problem === null ? <p className="text-ink-soft">Loading…</p> : null}
+      {report === null && problem === null ? (
+        <p className="font-hand text-2xl text-ink-soft">Sharpening pencils…</p>
+      ) : null}
     </main>
   );
 }

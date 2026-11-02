@@ -65,7 +65,7 @@ export function SettingsForm({ api = realApi }: SettingsFormProps) {
   return (
     <div className="flex flex-col gap-6">
       {error ? (
-        <p role="alert" className="rounded-md border border-rule p-4">
+        <p role="alert" className="max-w-2xl -rotate-1 rounded-sm bg-sticky-bug p-4 doodle-shadow">
           {error}
         </p>
       ) : null}
@@ -84,7 +84,7 @@ export function SettingsForm({ api = realApi }: SettingsFormProps) {
               value={fields.allowList}
               onChange={(event) => change("allowList", event.target.value)}
               rows={6}
-              className="rounded-md border border-rule bg-paper p-2 font-mono"
+              className="sketch-border bg-paper p-2 font-mono"
             />
           </div>
           <label className="flex flex-col gap-2">
@@ -92,7 +92,7 @@ export function SettingsForm({ api = realApi }: SettingsFormProps) {
             <select
               value={fields.weekStart}
               onChange={(event) => change("weekStart", event.target.value)}
-              className="rounded-md border border-rule bg-paper p-2"
+              className="sketch-border bg-paper p-2"
             >
               <option value="1">Monday</option>
               <option value="0">Sunday</option>
@@ -104,7 +104,7 @@ export function SettingsForm({ api = realApi }: SettingsFormProps) {
               list="time-zones"
               value={fields.timeZone}
               onChange={(event) => change("timeZone", event.target.value)}
-              className="rounded-md border border-rule bg-paper p-2"
+              className="sketch-border bg-paper p-2"
             />
             <datalist id="time-zones">
               {TIME_ZONES.map((zone) => (
@@ -113,7 +113,10 @@ export function SettingsForm({ api = realApi }: SettingsFormProps) {
             </datalist>
           </label>
           <div className="flex items-center gap-4">
-            <button type="submit" className="rounded-md bg-ink px-4 py-2 text-paper">
+            <button
+              type="submit"
+              className="sketch-border doodle-shadow bg-highlight px-4 py-2 font-semibold text-ink transition active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
+            >
               Save settings
             </button>
             {saved ? <p>Saved. Sync from the dashboard to pull in new repos.</p> : null}

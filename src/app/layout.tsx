@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Schibsted_Grotesk } from "next/font/google";
+import { Caveat, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 
 const schibsted = Schibsted_Grotesk({ subsets: ["latin"], variable: "--font-schibsted" });
+const caveat = Caveat({ subsets: ["latin"], variable: "--font-caveat" });
 
 export const metadata: Metadata = {
   title: "Tally",
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={schibsted.variable}>
+    <html lang="en" className={`${schibsted.variable} ${caveat.variable}`}>
       <body className="min-h-screen">{children}</body>
     </html>
   );

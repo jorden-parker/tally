@@ -81,7 +81,7 @@ describe("TicketCards", () => {
   it("says a ticket has no PR yet", () => {
     renderCards({ tickets: [makeTicket()] });
 
-    expect(within(card("31")).getByText("No PR yet")).toBeDefined();
+    expect(within(card("31")).getByText("No PR yet, still brewing")).toBeDefined();
   });
 
   it("links a draft PR, an open PR and a merged PR with their status", () => {
@@ -206,7 +206,9 @@ describe("TicketCards", () => {
   it("says when there are no tickets", () => {
     renderCards({});
 
-    expect(within(section("Your tickets")).getByText("No tickets assigned to you")).toBeDefined();
+    expect(
+      within(section("Your tickets")).getByText("Your desk is clear. Suspiciously clear."),
+    ).toBeDefined();
   });
 
   describe("reviewing", () => {
@@ -239,7 +241,7 @@ describe("TicketCards", () => {
       renderCards({});
 
       expect(
-        within(section("Reviewing")).getByText("Nothing waiting for your review"),
+        within(section("Reviewing")).getByText("Nobody needs your eyes right now."),
       ).toBeDefined();
     });
   });
@@ -261,8 +263,8 @@ describe("TicketCards", () => {
     });
 
     it.each([
-      ["day", "Nothing completed today"],
-      ["30d", "Nothing completed last 30 days"],
+      ["day", "Nothing ticked off today. Yet."],
+      ["30d", "Nothing ticked off last 30 days. Yet."],
     ] as const)("says when nothing was completed for %s", (range, text) => {
       renderCards({ range });
 

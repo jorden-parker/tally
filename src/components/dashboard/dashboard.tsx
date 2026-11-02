@@ -23,7 +23,7 @@ function RangeSwitch({ range, onChange }: { range: Range; onChange: (range: Rang
           type="button"
           aria-pressed={option === range}
           onClick={() => onChange(option)}
-          className="rounded-md px-3 py-1.5 text-sm aria-pressed:bg-ink aria-pressed:text-paper"
+          className="wobble rounded-md px-3 py-1.5 text-sm aria-pressed:highlighter aria-pressed:font-semibold"
         >
           {RANGE_LABELS[option]}
         </button>
@@ -51,7 +51,10 @@ function SetupNotes({ settings }: { settings: Settings }) {
 function Problems({ messages }: { messages: string[] }) {
   if (messages.length === 0) return null;
   return (
-    <div role="alert" className="flex flex-col gap-1 rounded-md border border-rule p-4">
+    <div
+      role="alert"
+      className="flex max-w-2xl -rotate-1 flex-col gap-1 rounded-sm bg-sticky-bug p-4 doodle-shadow"
+    >
       {messages.map((message) => (
         <p key={message}>{message}</p>
       ))}
@@ -69,7 +72,7 @@ function Report({ summary }: { summary: Summary }) {
         range={summary.range}
       />
       <section aria-label="Daily activity" className="flex flex-col gap-3">
-        <h2 className="font-semibold">Last four weeks</h2>
+        <h2 className="font-hand text-3xl font-bold">The last four weeks, in scribbles</h2>
         <DailyChart points={summary.daily} />
       </section>
     </>
@@ -80,9 +83,9 @@ export function Dashboard({ api = realApi, now = currentTime }: DashboardProps) 
   const { range, setRange, summary, settings, syncing, problems, sync } = useDashboard(api, now);
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10">
+    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 pt-10 pb-28">
       <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Tally</h1>
+        <h1 className="highlighter px-1 font-hand text-5xl font-bold">Tally</h1>
         <RangeSwitch range={range} onChange={setRange} />
         <div className="flex items-center gap-3 text-sm text-ink-soft">
           <span>{formatSynced(summary?.lastSyncedAt ?? null, now())}</span>
@@ -90,21 +93,25 @@ export function Dashboard({ api = realApi, now = currentTime }: DashboardProps) 
             type="button"
             onClick={sync}
             disabled={syncing}
-            className="underline underline-offset-4 disabled:opacity-60"
+            className="sketch-border doodle-shadow bg-paper px-3 py-1 text-ink transition active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:opacity-60"
           >
-            {syncing ? "Syncing…" : "Sync now"}
+            {syncing ? "Counting sheep…" : "Sync now"}
           </button>
-          <Link href="/work" className="underline underline-offset-4">
+          <Link href="/work" className="wobble underline underline-offset-4">
             Work log
           </Link>
-          <Link href="/settings" className="underline underline-offset-4">
+          <Link href="/settings" className="wobble underline underline-offset-4">
             Settings
           </Link>
         </div>
       </header>
       {settings ? <SetupNotes settings={settings} /> : null}
       <Problems messages={problems} />
-      {summary ? <Report summary={summary} /> : <p className="text-ink-soft">Loading…</p>}
+      {summary ? (
+        <Report summary={summary} />
+      ) : (
+        <p className="font-hand text-2xl text-ink-soft">Sharpening pencils…</p>
+      )}
     </main>
   );
 }

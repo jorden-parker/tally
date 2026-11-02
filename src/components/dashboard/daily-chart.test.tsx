@@ -42,6 +42,18 @@ describe("DailyChart", () => {
     expect(screen.getByRole("tooltip").textContent).toContain("Oct 11");
   });
 
+  it.each([
+    ["first", 0, { left: "0px", right: "" }],
+    ["last", POINTS.length - 1, { left: "", right: "0px" }],
+  ] as const)("keeps the tooltip for the %s day inside the chart", (_, index, edges) => {
+    render(<DailyChart points={POINTS} />);
+
+    fireEvent.mouseEnter(screen.getByTestId(`day-${POINTS[index].day}`));
+
+    const { left, right } = screen.getByRole("tooltip").style;
+    expect({ left, right }).toEqual(edges);
+  });
+
   it("handles a quiet month without dividing by zero", () => {
     const quiet = POINTS.map((point) => ({ ...point, reviewed: 0, created: 0 }));
 

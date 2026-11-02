@@ -172,8 +172,8 @@ describe("WorkLog", () => {
     render(<WorkLog api={fakeApi({ fetchWork })} now={now} />);
 
     const prs = await screen.findByRole("region", { name: "PRs merged" });
-    expect(within(prs).getByText("Nothing in this period")).toBeDefined();
-    expect(screen.getByText("No drafts in progress")).toBeDefined();
+    expect(within(prs).getByText("A quiet stretch. Nothing here.")).toBeDefined();
+    expect(screen.getByText("No drafts on the go.")).toBeDefined();
   });
 
   it("copies the report as Markdown", async () => {

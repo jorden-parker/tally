@@ -23,10 +23,22 @@ const ACCENT_BY_STORY_TYPE: Record<string, string> = {
 
 const DEFAULT_ACCENT = "border-l-rule";
 
+const STICKY_BY_STORY_TYPE: Record<string, string> = {
+  feature: "bg-sticky-feature",
+  bug: "bg-sticky-bug",
+  chore: "bg-sticky-chore",
+};
+
+const DEFAULT_STICKY = "bg-paper";
+
 const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 function accentFor(storyType: string | null): string {
   return (storyType && ACCENT_BY_STORY_TYPE[storyType]) || DEFAULT_ACCENT;
+}
+
+function stickyFor(storyType: string | null): string {
+  return (storyType && STICKY_BY_STORY_TYPE[storyType]) || DEFAULT_STICKY;
 }
 
 function capitalise(text: string): string {
@@ -61,7 +73,8 @@ function PullRequestStatus({
   pullRequests: TicketPullRequest[];
   labels: StatusLabels;
 }) {
-  if (pullRequests.length === 0) return <span className="text-sm text-ink-soft">No PR yet</span>;
+  if (pullRequests.length === 0)
+    return <span className="text-sm text-ink-soft">No PR yet, still brewing</span>;
   return (
     <ul className="flex flex-col gap-1 text-sm">
       {pullRequests.map((pullRequest) => (
@@ -88,7 +101,7 @@ function TicketCard({ ticket, labels }: { ticket: Ticket; labels: StatusLabels }
   return (
     <article
       aria-label={label}
-      className={`flex flex-col gap-3 rounded-md border border-rule border-l-4 p-4 ${accentFor(ticket.storyType)}`}
+      className={`flex flex-col gap-3 rounded-sm border-l-4 p-4 doodle-shadow transition odd:-rotate-1 even:rotate-1 hover:rotate-0 ${accentFor(ticket.storyType)} ${stickyFor(ticket.storyType)}`}
     >
       <div className="flex items-baseline justify-between gap-3 text-sm text-ink-soft">
         <span className="flex gap-2">
@@ -112,7 +125,7 @@ function TicketCard({ ticket, labels }: { ticket: Ticket; labels: StatusLabels }
         <span className="text-sm text-ink-soft">{completedText(ticket.completedAt)}</span>
       ) : null}
       <div className="mt-auto flex flex-wrap items-start justify-between gap-3">
-        <span className="rounded-full border border-rule px-2 py-0.5 text-sm">{ticket.state}</span>
+        <span className="sketch-border px-2 py-0.5 text-sm">{ticket.state}</span>
         <PullRequestStatus pullRequests={ticket.pullRequests} labels={labels} />
       </div>
     </article>
@@ -132,7 +145,7 @@ function CardSection({
 }) {
   return (
     <section aria-label={title} className="flex flex-col gap-3">
-      <h2 className="font-semibold">{title}</h2>
+      <h2 className="font-hand text-3xl font-bold">{title}</h2>
       {tickets.length === 0 ? (
         <p className="text-ink-soft">{emptyText}</p>
       ) : (
@@ -177,7 +190,7 @@ function UnlinkedPullRequests({ items }: { items: OpenItem[] }) {
   if (items.length === 0) return null;
   return (
     <section aria-label="Open PRs without a ticket" className="flex flex-col gap-3">
-      <h3 className="font-semibold">Open PRs without a ticket</h3>
+      <h3 className="font-hand text-2xl font-bold">Open PRs without a ticket</h3>
       <ul className="flex flex-col gap-3">
         {items.map((item) => (
           <UnlinkedPullRequest key={item.externalId} item={item} />
@@ -201,19 +214,19 @@ export function TicketCards({
     <div className="flex flex-col gap-8">
       <CardSection
         title="Your tickets"
-        emptyText="No tickets assigned to you"
+        emptyText="Your desk is clear. Suspiciously clear."
         tickets={open.tickets}
       />
       <UnlinkedPullRequests items={unlinkedPullRequests(open)} />
       <CardSection
         title="Reviewing"
-        emptyText="Nothing waiting for your review"
+        emptyText="Nobody needs your eyes right now."
         tickets={open.reviewing}
         labels={REVIEWER_LABELS}
       />
       <CardSection
         title={`Completed ${phrase}`}
-        emptyText={`Nothing completed ${phrase}`}
+        emptyText={`Nothing ticked off ${phrase}. Yet.`}
         tickets={completedTickets}
       />
     </div>

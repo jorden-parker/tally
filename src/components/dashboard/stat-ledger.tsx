@@ -12,9 +12,9 @@ type FigureProps = { label: string; value: number; note: string };
 
 function Figure({ label, value, note }: FigureProps) {
   return (
-    <div className="flex flex-col gap-1 border-l border-rule pl-4">
+    <div className="flex flex-col gap-1 border-l-2 border-dashed border-ink-soft pl-4">
       <dt className="text-sm text-ink-soft">{label}</dt>
-      <dd className="text-3xl font-semibold">{value}</dd>
+      <dd className="font-hand text-5xl font-bold">{value}</dd>
       <dd className="text-sm text-ink-soft">{note}</dd>
     </div>
   );
@@ -26,7 +26,7 @@ function Hero({ summary }: { summary: Summary }) {
     <section aria-label="Reviewed this period" className="flex flex-col gap-3">
       <TallyMarks count={reviewed} label={`${reviewed} PRs reviewed`} />
       <p className="flex items-baseline gap-3">
-        <span className="text-6xl font-semibold">{reviewed}</span>
+        <span className="font-hand text-8xl font-bold leading-none">{reviewed}</span>
         <span className="text-lg">PRs reviewed</span>
       </p>
       <p className="text-ink-soft">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { DailyPoint } from "@/lib/metrics/summary";
 import { formatDay } from "./format";
 
@@ -14,6 +14,10 @@ const BAR_GAP = 2;
 const BAR_RADIUS = 3;
 const MIN_SCALE = 4;
 const LABEL_EVERY = 7;
+const EDGE_ZONE_PERCENT = 25;
+const AXIS_FONT_SIZE = 15;
+const SCRIBBLE_PATH =
+  "M7 2.5C10.5 2 12.6 4.6 12 7.8 11.4 11 8.2 12.4 5.4 11.6 2.6 10.8 1.5 7.6 2.8 5 3.9 2.9 6.2 2.1 8.4 2.9";
 
 type DailyChartProps = { points: DailyPoint[] };
 
@@ -38,15 +42,31 @@ function describe(point: DailyPoint): string {
   return `${formatDay(point.day)}: ${point.reviewed} reviewed, ${point.created} created`;
 }
 
+function ScribbleSwatch({ className }: { className: string }) {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      aria-hidden="true"
+      className={`size-4 ${className}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+    >
+      <path d={SCRIBBLE_PATH} fill="currentColor" fillOpacity={0.35} />
+    </svg>
+  );
+}
+
 function Legend() {
   return (
     <ul aria-label="Legend" className="flex gap-5 text-sm">
       <li className="flex items-center gap-2">
-        <span className="size-3 rounded-sm bg-reviewed" aria-hidden="true" />
+        <ScribbleSwatch className="text-reviewed" />
         Reviewed
       </li>
       <li className="flex items-center gap-2">
-        <span className="size-3 rounded-sm bg-created" aria-hidden="true" />
+        <ScribbleSwatch className="text-created" />
         Created
       </li>
     </ul>
@@ -81,15 +101,24 @@ function TableView({ points }: DailyChartProps) {
   );
 }
 
+type TooltipPlacement = { style: CSSProperties; className: string };
+
+function tooltipPlacement(centrePercent: number): TooltipPlacement {
+  if (centrePercent < EDGE_ZONE_PERCENT) return { style: { left: 0 }, className: "" };
+  if (centrePercent > 100 - EDGE_ZONE_PERCENT) return { style: { right: 0 }, className: "" };
+  return { style: { left: `${centrePercent}%` }, className: "-translate-x-1/2" };
+}
+
 function Tooltip({ point, index, width }: { point: DailyPoint; index: number; width: number }) {
-  const left = ((LEFT + (index + 0.5) * COLUMN_WIDTH) / width) * 100;
+  const centre = ((LEFT + (index + 0.5) * COLUMN_WIDTH) / width) * 100;
+  const { style, className } = tooltipPlacement(centre);
   return (
     <div
       role="tooltip"
-      style={{ left: `${left}%` }}
-      className="pointer-events-none absolute top-0 flex -translate-x-1/2 flex-col rounded-md border border-rule bg-paper px-3 py-2 text-sm shadow-sm"
+      style={style}
+      className={`sketch-border doodle-shadow pointer-events-none absolute top-0 flex flex-col bg-paper px-3 py-2 text-sm ${className}`}
     >
-      <strong>{formatDay(point.day)}</strong>
+      <strong className="font-hand text-xl leading-none">{formatDay(point.day)}</strong>
       <span>{point.reviewed} reviewed</span>
       <span>{point.created} created</span>
     </div>
@@ -113,7 +142,7 @@ export function DailyChart({ points }: DailyChartProps) {
           viewBox={`0 0 ${width} ${height}`}
           className="h-auto w-full"
         >
-          <g className="text-ink-soft" fontSize={11} fill="currentColor">
+          <g className="font-hand text-ink-soft" fontSize={AXIS_FONT_SIZE} fill="currentColor">
             <text x={LEFT - 6} y={TOP + 4} textAnchor="end">
               {scale}
             </text>
@@ -139,9 +168,9 @@ export function DailyChart({ points }: DailyChartProps) {
                   <text
                     x={left}
                     y={baseline + 16}
-                    fontSize={11}
+                    fontSize={AXIS_FONT_SIZE}
                     fill="currentColor"
-                    className="text-ink-soft"
+                    className="font-hand text-ink-soft"
                   >
                     {formatDay(point.day)}
                   </text>

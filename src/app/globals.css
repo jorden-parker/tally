@@ -13,6 +13,12 @@
   --story-feature: #c9a227;
   --story-bug: #c75450;
   --story-chore: #6b8e9f;
+  --grid-dot: #dedbd3;
+  --highlight: #ffe27a;
+  --sticky-feature: #fbf3d2;
+  --sticky-bug: #fbe4e2;
+  --sticky-chore: #e2edf2;
+  --shadow-ink: #1d2430;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -26,6 +32,12 @@
     --story-feature: #d4b44a;
     --story-bug: #d8706c;
     --story-chore: #86a6b6;
+    --grid-dot: #33322e;
+    --highlight: #6e5c1c;
+    --sticky-feature: #2e2a1c;
+    --sticky-bug: #33211f;
+    --sticky-chore: #1e2a30;
+    --shadow-ink: #5c5a52;
   }
 }
 
@@ -39,11 +51,63 @@
   --color-story-feature: var(--story-feature);
   --color-story-bug: var(--story-bug);
   --color-story-chore: var(--story-chore);
+  --color-grid-dot: var(--grid-dot);
+  --color-highlight: var(--highlight);
+  --color-sticky-feature: var(--sticky-feature);
+  --color-sticky-bug: var(--sticky-bug);
+  --color-sticky-chore: var(--sticky-chore);
+  --color-shadow-ink: var(--shadow-ink);
   --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
+  --animate-draw: draw 450ms ease-out both;
+
+  @keyframes draw {
+    from {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 0;
+    }
+  }
+}
+
+@utility sketch-border {
+  border: 2px solid var(--ink);
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+
+@utility highlighter {
+  background-image: linear-gradient(
+    100deg,
+    transparent 1%,
+    var(--highlight) 3%,
+    var(--highlight) 96%,
+    transparent 99%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 60%;
+  background-position: 0 85%;
+  box-decoration-break: clone;
+}
+
+@utility doodle-shadow {
+  box-shadow: 3px 3px 0 var(--shadow-ink);
+}
+
+@utility wobble {
+  transition: rotate 150ms ease-out;
+
+  &:hover {
+    rotate: -2deg;
+  }
 }
 
 body {
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 22px 22px;
   color: var(--ink);
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
