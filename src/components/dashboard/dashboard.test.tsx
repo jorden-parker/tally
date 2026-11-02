@@ -7,12 +7,14 @@ import { Dashboard } from "./dashboard";
 const now = () => FIXED_NOW;
 
 describe("Dashboard", () => {
-  it("shows this week's figures and lists once loaded", async () => {
+  it("shows this week's figures, ticket cards and chart once loaded", async () => {
     render(<Dashboard api={fakeApi()} now={now} />);
 
     expect(await screen.findByRole("img", { name: "7 PRs reviewed" })).toBeDefined();
-    expect(screen.getByRole("link", { name: "Add retries" })).toBeDefined();
-    expect(screen.getByRole("region", { name: "Tickets assigned to you" })).toBeDefined();
+    expect(screen.getByRole("article", { name: "sc-31" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Open PRs without a ticket" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Daily activity" })).toBeDefined();
+    expect(screen.queryByText("PRs reviewed", { selector: "h3" })).toBeNull();
     expect(screen.getByRole("button", { name: "This week" }).getAttribute("aria-pressed")).toBe(
       "true",
     );

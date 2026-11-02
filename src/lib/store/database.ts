@@ -40,6 +40,23 @@ const SCHEMA = `
     changed_files INTEGER,
     PRIMARY KEY (source, external_id)
   );
+  CREATE TABLE IF NOT EXISTS tickets (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    opened_at TEXT NOT NULL,
+    story_type TEXT,
+    state TEXT NOT NULL,
+    estimate REAL
+  );
+  CREATE TABLE IF NOT EXISTS ticket_pull_requests (
+    ticket_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    is_draft INTEGER NOT NULL,
+    is_merged INTEGER NOT NULL,
+    PRIMARY KEY (ticket_id, url)
+  );
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

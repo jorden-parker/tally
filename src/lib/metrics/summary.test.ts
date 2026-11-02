@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { EventKind, TallyEvent } from "@/lib/store/events";
 import type { OpenItem } from "@/lib/store/open-items";
 import { DEFAULT_SETTINGS } from "@/lib/store/settings";
+import type { Ticket } from "@/lib/store/tickets";
 import { summarize, type SummaryInput } from "./summary";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
@@ -28,6 +29,7 @@ function input(range: SummaryInput["range"]): SummaryInput {
   return {
     events: EVENTS,
     openItems: [],
+    tickets: [],
     snapshots: { openAuthoredPrs: 2, reviewRequestedPrs: 1, storiesInProgress: 3 },
     settings: { ...DEFAULT_SETTINGS, allowList: ["acme"], timeZone: "UTC", weekStart: 1 },
     range,
@@ -61,15 +63,11 @@ describe("summarize", () => {
   it("ignores GitHub events outside the allow-list", () => {
     const summary = summarize(input("week"));
 
-    expect(summary.lists.reviewed.map((item) => item.url)).toEqual(["pr-1", "pr-2"]);
+    expect(summary.current.reviewed).toBe(2);
   });
 
-  it("lists the period's items newest first", () => {
-    const summary = summarize(input("week"));
-
-    expect(summary.lists.completed.map((item) => item.externalId)).toEqual(["story-1"]);
-    expect(summary.lists.created.map((item) => item.externalId)).toEqual(["created-1"]);
-    expect(summary.lists.merged.map((item) => item.externalId)).toEqual(["merged-1"]);
+  it("carries no per-period item lists", () => {
+    expect(summarize(input("week"))).not.toHaveProperty("lists");
   });
 
   it("gives 28 daily points ending today, with empty days as zero", () => {
@@ -116,25 +114,29 @@ const OPEN_ITEMS: OpenItem[] = [
     title: "Elsewhere",
     url: "https://github.com/stranger/lib/pull/2",
   },
+];
+
+const TICKETS: Ticket[] = [
   {
-    source: "shortcut",
-    externalId: "31",
-    openedAt: "2026-10-10T09:00:00Z",
-    isDraft: false,
-    repo: null,
+    id: "31",
     title: "Plan the rollout",
     url: "https://app.shortcut.com/acme/story/31",
+    openedAt: "2026-10-10T09:00:00Z",
+    storyType: "feature",
+    state: "In Progress",
+    estimate: 3,
+    pullRequests: [],
   },
 ];
 
 describe("open work", () => {
-  it("splits open items into PRs and tickets, and drops PRs outside the allow-list", () => {
-    const summary = summarize({ ...input("day"), openItems: OPEN_ITEMS });
+  it("drops open PRs outside the allow-list and passes tickets through", () => {
+    const summary = summarize({ ...input("day"), openItems: OPEN_ITEMS, tickets: TICKETS });
 
     expect(summary.open.prs.map((item) => item.externalId)).toEqual([
       "https://github.com/acme/api/pull/9",
     ]);
-    expect(summary.open.tickets.map((item) => item.externalId)).toEqual(["31"]);
+    expect(summary.open.tickets).toEqual(TICKETS);
   });
 
   it("keeps tickets when the allow-list no longer covers any repo", () => {
@@ -142,6 +144,7 @@ describe("open work", () => {
     const summary = summarize({
       ...base,
       openItems: OPEN_ITEMS,
+      tickets: TICKETS,
       settings: { ...base.settings, allowList: ["other"] },
     });
 
@@ -151,7 +154,7 @@ describe("open work", () => {
 
   it("reports the same open work for every range", () => {
     const withOpen = (range: SummaryInput["range"]) =>
-      summarize({ ...input(range), openItems: OPEN_ITEMS }).open;
+      summarize({ ...input(range), openItems: OPEN_ITEMS, tickets: TICKETS }).open;
 
     expect(withOpen("week")).toEqual(withOpen("day"));
     expect(withOpen("30d")).toEqual(withOpen("day"));

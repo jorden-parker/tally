@@ -4,6 +4,7 @@ import { summarize, type DayRange, type Range, type Summary } from "@/lib/metric
 import { workReport, type WorkReport } from "@/lib/metrics/work";
 import { eventsBetween } from "@/lib/store/events";
 import { loadOpenItems } from "@/lib/store/open-items";
+import { loadTickets } from "@/lib/store/tickets";
 import { loadSettings, loadSnapshots, saveSettings, type Settings } from "@/lib/store/settings";
 import { completedWork } from "@/lib/store/work";
 import { SYNC_WINDOW_DAYS, syncAll, type SyncDependencies, type SyncResult } from "@/lib/sync";
@@ -67,6 +68,7 @@ export function createServices(dependencies: SyncDependencies): Services {
       return summarize({
         events: eventsBetween(db, from.toISOString(), to.toISOString()),
         openItems: loadOpenItems(db),
+        tickets: loadTickets(db),
         snapshots: loadSnapshots(db),
         settings: loadSettings(db),
         range,

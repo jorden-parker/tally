@@ -2,6 +2,7 @@ import { filterToAllowList } from "@/lib/github/allow-list";
 import type { EventKind, TallyEvent } from "@/lib/store/events";
 import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings, Snapshots } from "@/lib/store/settings";
+import type { Ticket } from "@/lib/store/tickets";
 import { dayKey, shiftDay, weekKey } from "./buckets";
 
 export const RANGES = ["day", "week", "30d"] as const;
@@ -27,19 +28,14 @@ export type Summary = {
   previous: PeriodTotals;
   now: Snapshots;
   daily: DailyPoint[];
-  lists: {
-    reviewed: TallyEvent[];
-    created: TallyEvent[];
-    merged: TallyEvent[];
-    completed: TallyEvent[];
-  };
-  open: { prs: OpenItem[]; tickets: OpenItem[] };
+  open: { prs: OpenItem[]; tickets: Ticket[] };
   lastSyncedAt: string | null;
 };
 
 export type SummaryInput = {
   events: TallyEvent[];
   openItems: OpenItem[];
+  tickets: Ticket[];
   snapshots: Snapshots;
   settings: Settings;
   range: Range;
@@ -58,14 +54,11 @@ export function allowedEvents<T extends TallyEvent>(events: T[], allowList: stri
   return [...filterToAllowList(github, allowList), ...others];
 }
 
-export function openWork(items: OpenItem[], allowList: string[]): Summary["open"] {
-  return {
-    prs: filterToAllowList(
-      items.filter((item) => item.source === "github"),
-      allowList,
-    ),
-    tickets: items.filter((item) => item.source === "shortcut"),
-  };
+export function openPullRequests(items: OpenItem[], allowList: string[]): OpenItem[] {
+  return filterToAllowList(
+    items.filter((item) => item.source === "github"),
+    allowList,
+  );
 }
 
 function currentPeriod(input: SummaryInput, today: string): { current: DayRange; shift: number } {
@@ -98,22 +91,12 @@ function distinctByUrl(newestFirst: TallyEvent[]): TallyEvent[] {
   });
 }
 
-function lists(dated: DatedEvent[], period: DayRange): Summary["lists"] {
-  return {
-    reviewed: distinctByUrl(inPeriod(dated, "pr_reviewed", period)),
-    created: inPeriod(dated, "pr_created", period),
-    merged: inPeriod(dated, "pr_merged", period),
-    completed: inPeriod(dated, "story_completed", period),
-  };
-}
-
 function totals(dated: DatedEvent[], period: DayRange): PeriodTotals {
-  const items = lists(dated, period);
   return {
-    reviewed: items.reviewed.length,
-    created: items.created.length,
-    merged: items.merged.length,
-    completed: items.completed.length,
+    reviewed: distinctByUrl(inPeriod(dated, "pr_reviewed", period)).length,
+    created: inPeriod(dated, "pr_created", period).length,
+    merged: inPeriod(dated, "pr_merged", period).length,
+    completed: inPeriod(dated, "story_completed", period).length,
   };
 }
 
@@ -139,8 +122,10 @@ export function summarize(input: SummaryInput): Summary {
     previous: totals(dated, shiftRange(current, shift)),
     now: snapshots,
     daily: dailyPoints(dated, today),
-    lists: lists(dated, current),
-    open: openWork(input.openItems, settings.allowList),
+    open: {
+      prs: openPullRequests(input.openItems, settings.allowList),
+      tickets: input.tickets,
+    },
     lastSyncedAt: settings.lastSyncedAt,
   };
 }

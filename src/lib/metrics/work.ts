@@ -2,7 +2,7 @@ import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings } from "@/lib/store/settings";
 import type { WorkItem } from "@/lib/store/work";
 import { countByBucket, dayKey, type BucketCount } from "./buckets";
-import { allowedEvents, openWork, type DayRange } from "./summary";
+import { allowedEvents, openPullRequests, type DayRange } from "./summary";
 
 export type WorkRow = WorkItem & { day: string };
 
@@ -81,8 +81,8 @@ export function workReport({ items, openItems, settings, period }: WorkReportInp
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   const prs = rows.filter((row) => row.kind === "pr_merged");
   const tickets = rows.filter((row) => row.kind === "story_completed");
-  const drafts = openWork(openItems, allowList)
-    .prs.filter((item) => item.isDraft)
+  const drafts = openPullRequests(openItems, allowList)
+    .filter((item) => item.isDraft)
     .map((item) => ({ ...item, day: dayKey(item.openedAt, timeZone) }));
   return { ...period, totals: totalsOf(prs, tickets), prs, tickets, drafts };
 }

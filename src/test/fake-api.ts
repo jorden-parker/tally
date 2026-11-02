@@ -4,13 +4,14 @@ import type { WorkReport, WorkRow } from "@/lib/metrics/work";
 import type { TallyEvent } from "@/lib/store/events";
 import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings } from "@/lib/store/settings";
+import type { Ticket } from "@/lib/store/tickets";
 
 export const FIXED_NOW = new Date("2026-10-30T12:00:00Z");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WORK_PERIOD = { from: "2026-10-01", to: "2026-10-30" };
 
-export function makeEvent(kind: TallyEvent["kind"], title: string, repo = "acme/api"): TallyEvent {
+function makeEvent(kind: TallyEvent["kind"], title: string, repo = "acme/api"): TallyEvent {
   return {
     source: kind === "story_completed" ? "shortcut" : "github",
     kind,
@@ -38,6 +39,20 @@ function makeOpenItem(
   };
 }
 
+export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
+  return {
+    id: "31",
+    title: "Plan the rollout",
+    url: "https://app.shortcut.com/acme/story/31",
+    openedAt: "2026-10-10T09:00:00Z",
+    storyType: "feature",
+    state: "In Progress",
+    estimate: 3,
+    pullRequests: [],
+    ...overrides,
+  };
+}
+
 function dailyPoints(): DailyPoint[] {
   return Array.from({ length: 28 }, (_, index) => {
     const day = new Date(Date.UTC(2026, 9, 3 + index)).toISOString().slice(0, 10);
@@ -52,15 +67,9 @@ export function makeSummary(overrides: Partial<Summary> = {}): Summary {
     previous: { reviewed: 4, created: 3, merged: 0, completed: 5 },
     now: { openAuthoredPrs: 2, reviewRequestedPrs: 1, storiesInProgress: 3 },
     daily: dailyPoints(),
-    lists: {
-      reviewed: [makeEvent("pr_reviewed", "Add retries")],
-      created: [makeEvent("pr_created", "Fix flaky test")],
-      merged: [],
-      completed: [makeEvent("story_completed", "Ship the tracker")],
-    },
     open: {
       prs: [makeOpenItem("github", "Tidy the proxy", "acme/api")],
-      tickets: [makeOpenItem("shortcut", "Plan the rollout")],
+      tickets: [makeTicket()],
     },
     lastSyncedAt: "2026-10-30T11:55:00Z",
     ...overrides,

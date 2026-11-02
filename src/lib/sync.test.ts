@@ -6,6 +6,7 @@ import { openDatabase } from "@/lib/store/database";
 import { eventsBetween } from "@/lib/store/events";
 import { loadOpenItems } from "@/lib/store/open-items";
 import { loadSettings, loadSnapshots, saveSettings } from "@/lib/store/settings";
+import { loadTickets } from "@/lib/store/tickets";
 import { completedWork } from "@/lib/store/work";
 import { syncAll } from "./sync";
 
@@ -92,6 +93,7 @@ function withOpenAuthoredPrs(openPrs: unknown[]): Runner {
 
 const fakeShortcut: ShortcutGet = async <T>(path: string) => {
   if (path.endsWith("/member")) return { mention_name: "jorden" } as T;
+  if (path.endsWith("/workflows")) return [{ states: [{ id: 500, name: "In Progress" }] }] as T;
   const query = new URL(path, "https://api.app.shortcut.com").searchParams.get("query") ?? "";
   if (query.includes("!is:archived")) {
     return {
@@ -102,6 +104,18 @@ const fakeShortcut: ShortcutGet = async <T>(path: string) => {
           app_url: "https://app.shortcut.com/acme/story/31",
           completed_at: null,
           created_at: "2026-10-10T09:00:00Z",
+          workflow_state_id: 500,
+          story_type: "feature",
+          estimate: 3,
+          pull_requests: [
+            {
+              url: "https://github.com/acme/api/pull/5",
+              title: "Roll out",
+              draft: true,
+              merged: false,
+              closed: false,
+            },
+          ],
         },
       ],
       next: null,
@@ -296,22 +310,31 @@ describe("syncAll", () => {
     expect(loadSettings(db).lastSyncedAt).toBeNull();
   });
 
-  it("stores my assigned stories from Shortcut", async () => {
+  it("stores my assigned stories from Shortcut as tickets, not open items", async () => {
     const { run } = fakeGitHub();
 
     await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
 
-    expect(loadOpenItems(db).filter((item) => item.source === "shortcut")).toEqual([
+    expect(loadTickets(db)).toEqual([
       {
-        source: "shortcut",
-        externalId: "31",
-        openedAt: "2026-10-10T09:00:00Z",
-        isDraft: false,
-        repo: null,
+        id: "31",
         title: "Plan the rollout",
         url: "https://app.shortcut.com/acme/story/31",
+        openedAt: "2026-10-10T09:00:00Z",
+        storyType: "feature",
+        state: "In Progress",
+        estimate: 3,
+        pullRequests: [
+          {
+            url: "https://github.com/acme/api/pull/5",
+            title: "Roll out",
+            isDraft: true,
+            isMerged: false,
+          },
+        ],
       },
     ]);
+    expect(loadOpenItems(db).every((item) => item.source === "github")).toBe(true);
   });
 
   it("keeps the open PRs and the stored stories when Shortcut fails", async () => {
@@ -328,7 +351,7 @@ describe("syncAll", () => {
       "https://github.com/acme/web/pull/6",
       "https://github.com/acme/api/pull/5",
     ]);
-    expect(loadOpenItems(db).filter((item) => item.source === "shortcut")).toHaveLength(1);
+    expect(loadTickets(db)).toHaveLength(1);
   });
 
   it("names repos whose reviews the allow-list dropped", async () => {

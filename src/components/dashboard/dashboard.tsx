@@ -6,8 +6,8 @@ import type { Settings } from "@/lib/store/settings";
 import { api as realApi, type TallyApi } from "../api";
 import { DailyChart } from "./daily-chart";
 import { formatSynced } from "./format";
-import { ItemLists, OpenLists } from "./item-lists";
 import { StatLedger } from "./stat-ledger";
+import { TicketCards } from "./ticket-cards";
 import { useDashboard } from "./use-dashboard";
 
 const RANGE_LABELS: Record<Range, string> = {
@@ -69,12 +69,11 @@ function Report({ summary }: { summary: Summary }) {
   return (
     <>
       <StatLedger summary={summary} />
-      <OpenLists open={summary.open} />
+      <TicketCards open={summary.open} />
       <section aria-label="Daily activity" className="flex flex-col gap-3">
         <h2 className="font-semibold">Last four weeks</h2>
         <DailyChart points={summary.daily} />
       </section>
-      <ItemLists lists={summary.lists} />
     </>
   );
 }
@@ -83,7 +82,7 @@ export function Dashboard({ api = realApi, now = currentTime }: DashboardProps) 
   const { range, setRange, summary, settings, syncing, problems, sync } = useDashboard(api, now);
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-10 px-6 py-10">
+    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Tally</h1>
         <RangeSwitch range={range} onChange={setRange} />
@@ -93,7 +92,7 @@ export function Dashboard({ api = realApi, now = currentTime }: DashboardProps) 
             type="button"
             onClick={sync}
             disabled={syncing}
-            className="rounded-md border border-rule px-3 py-1.5 text-ink disabled:opacity-60"
+            className="underline underline-offset-4 disabled:opacity-60"
           >
             {syncing ? "Syncing…" : "Sync now"}
           </button>

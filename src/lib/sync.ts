@@ -14,10 +14,12 @@ import {
   fetchAssignedStories,
   fetchCompletedStories,
   fetchMentionName,
+  fetchWorkflowStateNames,
 } from "@/lib/shortcut/stories";
 import { upsertEvents, type EventSource } from "@/lib/store/events";
 import { replaceOpenItems } from "@/lib/store/open-items";
 import { loadSettings, recordSnapshots, saveSettings } from "@/lib/store/settings";
+import { replaceTickets } from "@/lib/store/tickets";
 import { upsertWorkDetails } from "@/lib/store/work";
 
 export const SYNC_WINDOW_DAYS = 60;
@@ -99,7 +101,8 @@ async function syncShortcut({ db }: SyncDependencies, get: ShortcutGet, now: Dat
   upsertWorkDetails(db, completed);
   const storiesInProgress = await countInProgressStories(get, mentionName);
   recordSnapshots(db, { storiesInProgress }, now.toISOString());
-  replaceOpenItems(db, "shortcut", await fetchAssignedStories(get, mentionName));
+  const stateNames = await fetchWorkflowStateNames(get);
+  replaceTickets(db, await fetchAssignedStories(get, mentionName, stateNames));
 }
 
 async function capture(

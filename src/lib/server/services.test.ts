@@ -4,14 +4,15 @@ import { openDatabase } from "@/lib/store/database";
 import { upsertEvents } from "@/lib/store/events";
 import { replaceOpenItems } from "@/lib/store/open-items";
 import { loadSettings, saveSettings } from "@/lib/store/settings";
+import { replaceTickets } from "@/lib/store/tickets";
 import { upsertWorkDetails, type WorkItem } from "@/lib/store/work";
 import { createServices, InvalidSettingsError, parseDayRange, type Services } from "./services";
 import type { ShortcutGet } from "@/lib/shortcut/client";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
 
-const emptyShortcut: ShortcutGet = async <T>() =>
-  ({ mention_name: "jorden", data: [], next: null }) as T;
+const emptyShortcut: ShortcutGet = async <T>(path: string) =>
+  (path.endsWith("/workflows") ? [] : { mention_name: "jorden", data: [], next: null }) as T;
 
 function services(db: DatabaseSync): Services {
   return createServices({
@@ -86,15 +87,16 @@ describe("services", () => {
         url: "https://github.com/acme/api/pull/3",
       },
     ]);
-    replaceOpenItems(db, "shortcut", [
+    replaceTickets(db, [
       {
-        source: "shortcut",
-        externalId: "31",
-        openedAt: "2026-10-10T09:00:00Z",
-        isDraft: false,
-        repo: null,
+        id: "31",
         title: "Plan the rollout",
         url: "https://app.shortcut.com/acme/story/31",
+        openedAt: "2026-10-10T09:00:00Z",
+        storyType: "feature",
+        state: "In Progress",
+        estimate: 3,
+        pullRequests: [],
       },
     ]);
 

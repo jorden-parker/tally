@@ -10,6 +10,9 @@
   --rule: #e3e1dc;
   --series-reviewed: #2a78d6;
   --series-created: #eb6834;
+  --story-feature: #c9a227;
+  --story-bug: #c75450;
+  --story-chore: #6b8e9f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,6 +23,9 @@
     --rule: #34332f;
     --series-reviewed: #3987e5;
     --series-created: #d95926;
+    --story-feature: #d4b44a;
+    --story-bug: #d8706c;
+    --story-chore: #86a6b6;
   }
 }
 
@@ -30,6 +36,9 @@
   --color-rule: var(--rule);
   --color-reviewed: var(--series-reviewed);
   --color-created: var(--series-created);
+  --color-story-feature: var(--story-feature);
+  --color-story-bug: var(--story-bug);
+  --color-story-chore: var(--story-chore);
   --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
 }
 

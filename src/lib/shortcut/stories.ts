@@ -1,8 +1,16 @@
-import type { OpenItem } from "@/lib/store/open-items";
+import type { Ticket, TicketPullRequest } from "@/lib/store/tickets";
 import type { WorkItem } from "@/lib/store/work";
 import type { ShortcutGet } from "./client";
 
 export type DayWindow = { fromDay: string; toDay: string };
+
+type StoryPullRequest = {
+  url: string;
+  title: string;
+  draft: boolean;
+  merged: boolean;
+  closed: boolean;
+};
 
 type Story = {
   id: number;
@@ -10,10 +18,17 @@ type Story = {
   app_url: string;
   completed_at: string | null;
   created_at: string;
+  workflow_state_id: number;
   started_at?: string | null;
   estimate?: number | null;
   story_type?: string;
+  pull_requests?: StoryPullRequest[];
 };
+
+type Workflow = { states: { id: number; name: string }[] };
+
+const WORKFLOWS_PATH = "/api/v3/workflows";
+const UNKNOWN_STATE = "Unknown";
 
 type StorySearchPage = {
   data: Story[];
@@ -84,18 +99,42 @@ export async function countInProgressStories(
   return page.total ?? page.data.length;
 }
 
+export async function fetchWorkflowStateNames(get: ShortcutGet): Promise<Map<number, string>> {
+  const workflows = await get<Workflow[]>(WORKFLOWS_PATH);
+  return new Map(
+    workflows.flatMap((workflow) => workflow.states.map((state) => [state.id, state.name])),
+  );
+}
+
+function toTicketPullRequests(pullRequests: StoryPullRequest[]): TicketPullRequest[] {
+  return pullRequests
+    .filter((pullRequest) => pullRequest.merged || !pullRequest.closed)
+    .map((pullRequest) => ({
+      url: pullRequest.url,
+      title: pullRequest.title,
+      isDraft: pullRequest.draft,
+      isMerged: pullRequest.merged,
+    }));
+}
+
+function toTicket(story: Story, stateNames: Map<number, string>): Ticket {
+  return {
+    id: String(story.id),
+    title: story.name,
+    url: story.app_url,
+    openedAt: story.created_at,
+    storyType: story.story_type ?? null,
+    state: stateNames.get(story.workflow_state_id) ?? UNKNOWN_STATE,
+    estimate: story.estimate ?? null,
+    pullRequests: toTicketPullRequests(story.pull_requests ?? []),
+  };
+}
+
 export async function fetchAssignedStories(
   get: ShortcutGet,
   mentionName: string,
-): Promise<OpenItem[]> {
+  stateNames: Map<number, string>,
+): Promise<Ticket[]> {
   const stories = await searchAllStories(get, `owner:${mentionName} !is:done !is:archived`);
-  return stories.map((story) => ({
-    source: "shortcut",
-    externalId: String(story.id),
-    openedAt: story.created_at,
-    isDraft: false,
-    repo: null,
-    title: story.name,
-    url: story.app_url,
-  }));
+  return stories.map((story) => toTicket(story, stateNames));
 }

@@ -5,6 +5,7 @@ import {
   fetchAssignedStories,
   fetchCompletedStories,
   fetchMentionName,
+  fetchWorkflowStateNames,
 } from "./stories";
 
 function story(id: number, completedAt: string | null) {
@@ -14,8 +15,11 @@ function story(id: number, completedAt: string | null) {
     app_url: `https://app.shortcut.com/acme/story/${id}`,
     completed_at: completedAt,
     created_at: "2026-10-01T09:00:00Z",
+    workflow_state_id: 500,
   };
 }
+
+const STATE_NAMES = new Map([[500, "In Progress"]]);
 
 function queryOf(path: string): string | null {
   return new URL(path, "https://api.app.shortcut.com").searchParams.get("query");
@@ -120,28 +124,117 @@ describe("countInProgressStories", () => {
   });
 });
 
-describe("fetchAssignedStories", () => {
-  it("searches my unfinished, unarchived stories and maps them to open items", async () => {
+describe("fetchWorkflowStateNames", () => {
+  it("maps every state id across every workflow to its name", async () => {
     const paths: string[] = [];
     const get: ShortcutGet = async <T>(path: string) => {
       paths.push(path);
-      return { data: [story(31, null)], next: null } as T;
+      return [
+        {
+          states: [
+            { id: 500, name: "In Progress" },
+            { id: 501, name: "Done" },
+          ],
+        },
+        { states: [{ id: 600, name: "Backlog" }] },
+      ] as T;
     };
 
-    const items = await fetchAssignedStories(get, "jorden");
+    const names = await fetchWorkflowStateNames(get);
+
+    expect(paths).toEqual(["/api/v3/workflows"]);
+    expect(names).toEqual(
+      new Map([
+        [500, "In Progress"],
+        [501, "Done"],
+        [600, "Backlog"],
+      ]),
+    );
+  });
+});
+
+describe("fetchAssignedStories", () => {
+  it("searches my unfinished, unarchived stories and maps them to tickets", async () => {
+    const paths: string[] = [];
+    const get: ShortcutGet = async <T>(path: string) => {
+      paths.push(path);
+      return {
+        data: [
+          {
+            ...story(31, null),
+            story_type: "bug",
+            estimate: 2,
+            pull_requests: [
+              {
+                url: "https://github.com/acme/api/pull/9",
+                title: "Fix retries",
+                draft: true,
+                merged: false,
+                closed: false,
+              },
+              {
+                url: "https://github.com/acme/api/pull/8",
+                title: "Ship retries",
+                draft: false,
+                merged: true,
+                closed: true,
+              },
+              {
+                url: "https://github.com/acme/api/pull/7",
+                title: "Abandoned",
+                draft: false,
+                merged: false,
+                closed: true,
+              },
+            ],
+          },
+        ],
+        next: null,
+      } as T;
+    };
+
+    const tickets = await fetchAssignedStories(get, "jorden", STATE_NAMES);
 
     expect(queryOf(paths[0])).toBe("owner:jorden !is:done !is:archived");
-    expect(items).toEqual([
+    expect(tickets).toEqual([
       {
-        source: "shortcut",
-        externalId: "31",
-        openedAt: "2026-10-01T09:00:00Z",
-        isDraft: false,
-        repo: null,
+        id: "31",
         title: "Story 31",
         url: "https://app.shortcut.com/acme/story/31",
+        openedAt: "2026-10-01T09:00:00Z",
+        storyType: "bug",
+        state: "In Progress",
+        estimate: 2,
+        pullRequests: [
+          {
+            url: "https://github.com/acme/api/pull/9",
+            title: "Fix retries",
+            isDraft: true,
+            isMerged: false,
+          },
+          {
+            url: "https://github.com/acme/api/pull/8",
+            title: "Ship retries",
+            isDraft: false,
+            isMerged: true,
+          },
+        ],
       },
     ]);
+  });
+
+  it("nulls what Shortcut omits and names an unknown state", async () => {
+    const get: ShortcutGet = async <T>() =>
+      ({ data: [{ ...story(31, null), workflow_state_id: 999 }], next: null }) as T;
+
+    const [ticket] = await fetchAssignedStories(get, "jorden", STATE_NAMES);
+
+    expect(ticket).toMatchObject({
+      storyType: null,
+      estimate: null,
+      state: "Unknown",
+      pullRequests: [],
+    });
   });
 
   it("follows the next link so stories past the first page are included", async () => {
@@ -155,9 +248,9 @@ describe("fetchAssignedStories", () => {
       ) as T;
     };
 
-    const items = await fetchAssignedStories(get, "jorden");
+    const tickets = await fetchAssignedStories(get, "jorden", STATE_NAMES);
 
     expect(paths[1]).toBe("/api/v3/search/stories?next=abc");
-    expect(items.map((item) => item.externalId)).toEqual(["1", "2"]);
+    expect(tickets.map((ticket) => ticket.id)).toEqual(["1", "2"]);
   });
 });

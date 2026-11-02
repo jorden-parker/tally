@@ -25,17 +25,10 @@ describe("StatLedger", () => {
     expect(within(figure("Tickets completed")).getByText("1 fewer than yesterday")).toBeDefined();
   });
 
-  it("shows where things stand right now", () => {
+  it("no longer shows the point-in-time figures", () => {
     render(<StatLedger summary={makeSummary()} />);
 
-    expect(within(figure("Your open PRs")).getByText("2")).toBeDefined();
-    expect(within(figure("Waiting on your review")).getByText("1")).toBeDefined();
-    expect(within(figure("Tickets in progress")).getByText("3")).toBeDefined();
-  });
-
-  it("shows a dash where a snapshot has not been taken yet", () => {
-    render(<StatLedger summary={makeSummary({ now: {} })} />);
-
-    expect(within(figure("Tickets in progress")).getByText("–")).toBeDefined();
+    expect(screen.queryByText("Right now")).toBeNull();
+    expect(screen.queryByText("Tickets in progress")).toBeNull();
   });
 });
