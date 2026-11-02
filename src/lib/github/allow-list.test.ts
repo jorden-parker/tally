@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TallyEvent } from "@/lib/store/events";
-import { filterToAllowList, isAllowed, uncountedRepos } from "./allow-list";
+import { filterToAllowList, uncountedRepos } from "./allow-list";
 
 const event = (repo: string | null): TallyEvent => ({
   source: "github",
@@ -12,7 +12,17 @@ const event = (repo: string | null): TallyEvent => ({
   url: "u",
 });
 
-describe("isAllowed", () => {
+describe("filterToAllowList", () => {
+  function isAllowed(repo: string, allowList: string[]): boolean {
+    return filterToAllowList([event(repo)], allowList).length === 1;
+  }
+
+  it("keeps only events in allowed repos", () => {
+    const kept = filterToAllowList([event("acme/api"), event("other/api"), event(null)], ["acme"]);
+
+    expect(kept.map((item) => item.repo)).toEqual(["acme/api"]);
+  });
+
   it("allows every repo under a listed owner", () => {
     expect(isAllowed("acme/api", ["acme"])).toBe(true);
     expect(isAllowed("acme/web", ["acme"])).toBe(true);
@@ -33,14 +43,6 @@ describe("isAllowed", () => {
 
   it("allows nothing when the list is empty", () => {
     expect(isAllowed("acme/api", [])).toBe(false);
-  });
-});
-
-describe("filterToAllowList", () => {
-  it("keeps only events in allowed repos", () => {
-    const kept = filterToAllowList([event("acme/api"), event("other/api"), event(null)], ["acme"]);
-
-    expect(kept.map((item) => item.repo)).toEqual(["acme/api"]);
   });
 });
 

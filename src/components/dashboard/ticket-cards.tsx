@@ -1,6 +1,19 @@
-import type { Summary } from "@/lib/metrics/summary";
+import { dayKey } from "@/lib/metrics/buckets";
+import type { Range, Summary } from "@/lib/metrics/summary";
+import { REVIEW_STATUS_LABELS } from "@/lib/review-status";
 import type { OpenItem } from "@/lib/store/open-items";
+import type { ReviewStatus } from "@/lib/store/pull-request-reviews";
 import type { Ticket, TicketPullRequest } from "@/lib/store/tickets";
+import { formatLongDay, rangePhrase } from "./format";
+
+type StatusLabels = Record<ReviewStatus, string>;
+
+const REVIEWER_LABELS: StatusLabels = {
+  awaiting_review: "Awaiting your review",
+  in_review: "You are reviewing",
+  changes_requested: "You requested changes",
+  approved: "Approved",
+};
 
 const ACCENT_BY_STORY_TYPE: Record<string, string> = {
   feature: "border-l-story-feature",
@@ -9,6 +22,8 @@ const ACCENT_BY_STORY_TYPE: Record<string, string> = {
 };
 
 const DEFAULT_ACCENT = "border-l-rule";
+
+const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 function accentFor(storyType: string | null): string {
   return (storyType && ACCENT_BY_STORY_TYPE[storyType]) || DEFAULT_ACCENT;
@@ -22,13 +37,23 @@ function estimateText(estimate: number): string {
   return estimate === 1 ? "1 point" : `${estimate} points`;
 }
 
-function pullRequestStatus(pullRequest: TicketPullRequest): string {
+function pullRequestStatus(pullRequest: TicketPullRequest, labels: StatusLabels): string {
   if (pullRequest.isMerged) return "PR merged";
   if (pullRequest.isDraft) return "Draft PR";
-  return "PR open";
+  return pullRequest.reviewStatus === null ? "PR open" : labels[pullRequest.reviewStatus];
 }
 
-function PullRequestStatus({ pullRequests }: { pullRequests: TicketPullRequest[] }) {
+function completedText(completedAt: string): string {
+  return `Completed ${formatLongDay(dayKey(completedAt, LOCAL_TIME_ZONE))}`;
+}
+
+function PullRequestStatus({
+  pullRequests,
+  labels,
+}: {
+  pullRequests: TicketPullRequest[];
+  labels: StatusLabels;
+}) {
   if (pullRequests.length === 0) return <span className="text-sm text-ink-soft">No PR yet</span>;
   return (
     <ul className="flex flex-col gap-1 text-sm">
@@ -40,7 +65,7 @@ function PullRequestStatus({ pullRequests }: { pullRequests: TicketPullRequest[]
             rel="noreferrer"
             className="underline-offset-4 hover:underline"
           >
-            {pullRequestStatus(pullRequest)}
+            {pullRequestStatus(pullRequest, labels)}
           </a>
         </li>
       ))}
@@ -48,7 +73,7 @@ function PullRequestStatus({ pullRequests }: { pullRequests: TicketPullRequest[]
   );
 }
 
-function TicketCard({ ticket }: { ticket: Ticket }) {
+function TicketCard({ ticket, labels }: { ticket: Ticket; labels: StatusLabels }) {
   const label = `sc-${ticket.id}`;
   return (
     <article
@@ -70,11 +95,44 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
       >
         {ticket.title}
       </a>
+      {ticket.role === "reviewing" ? (
+        <span className="text-sm text-ink-soft">Owned by {ticket.owners.join(", ")}</span>
+      ) : null}
+      {ticket.role === "completed" && ticket.completedAt !== null ? (
+        <span className="text-sm text-ink-soft">{completedText(ticket.completedAt)}</span>
+      ) : null}
       <div className="mt-auto flex flex-wrap items-start justify-between gap-3">
         <span className="rounded-full border border-rule px-2 py-0.5 text-sm">{ticket.state}</span>
-        <PullRequestStatus pullRequests={ticket.pullRequests} />
+        <PullRequestStatus pullRequests={ticket.pullRequests} labels={labels} />
       </div>
     </article>
+  );
+}
+
+function CardSection({
+  title,
+  emptyText,
+  tickets,
+  labels = REVIEW_STATUS_LABELS,
+}: {
+  title: string;
+  emptyText: string;
+  tickets: Ticket[];
+  labels?: StatusLabels;
+}) {
+  return (
+    <section aria-label={title} className="flex flex-col gap-3">
+      <h2 className="font-semibold">{title}</h2>
+      {tickets.length === 0 ? (
+        <p className="text-ink-soft">{emptyText}</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {tickets.map((ticket) => (
+            <TicketCard key={ticket.id} ticket={ticket} labels={labels} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -90,6 +148,9 @@ function UnlinkedPullRequest({ item }: { item: OpenItem }) {
         {item.title}
       </a>
       {item.isDraft ? <span className="text-sm text-ink-soft">Draft</span> : null}
+      {item.reviewStatus === null ? null : (
+        <span className="text-sm text-ink-soft">{REVIEW_STATUS_LABELS[item.reviewStatus]}</span>
+      )}
       {item.repo ? <span className="text-sm text-ink-soft">{item.repo}</span> : null}
     </li>
   );
@@ -116,22 +177,35 @@ function UnlinkedPullRequests({ items }: { items: OpenItem[] }) {
   );
 }
 
-export function TicketCards({ open }: { open: Summary["open"] }) {
+export function TicketCards({
+  open,
+  completedTickets,
+  range,
+}: {
+  open: Summary["open"];
+  completedTickets: Ticket[];
+  range: Range;
+}) {
+  const phrase = rangePhrase(range);
   return (
     <div className="flex flex-col gap-8">
-      <section aria-label="Your tickets" className="flex flex-col gap-3">
-        <h2 className="font-semibold">Your tickets</h2>
-        {open.tickets.length === 0 ? (
-          <p className="text-ink-soft">No tickets assigned to you</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {open.tickets.map((ticket) => (
-              <TicketCard key={ticket.id} ticket={ticket} />
-            ))}
-          </div>
-        )}
-      </section>
+      <CardSection
+        title="Your tickets"
+        emptyText="No tickets assigned to you"
+        tickets={open.tickets}
+      />
       <UnlinkedPullRequests items={unlinkedPullRequests(open)} />
+      <CardSection
+        title="Reviewing"
+        emptyText="Nothing waiting for your review"
+        tickets={open.reviewing}
+        labels={REVIEWER_LABELS}
+      />
+      <CardSection
+        title={`Completed ${phrase}`}
+        emptyText={`Nothing completed ${phrase}`}
+        tickets={completedTickets}
+      />
     </div>
   );
 }

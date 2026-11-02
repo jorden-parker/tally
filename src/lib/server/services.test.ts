@@ -12,7 +12,9 @@ import type { ShortcutGet } from "@/lib/shortcut/client";
 const NOW = new Date("2026-10-30T12:00:00Z");
 
 const emptyShortcut: ShortcutGet = async <T>(path: string) =>
-  (path.endsWith("/workflows") ? [] : { mention_name: "jorden", data: [], next: null }) as T;
+  (path.endsWith("/workflows") || path.endsWith("/members")
+    ? []
+    : { mention_name: "jorden", data: [], next: null }) as T;
 
 function services(db: DatabaseSync): Services {
   return createServices({
@@ -85,6 +87,7 @@ describe("services", () => {
         repo: "acme/api",
         title: "Add retries",
         url: "https://github.com/acme/api/pull/3",
+        reviewStatus: null,
       },
     ]);
     replaceTickets(db, [
@@ -96,6 +99,9 @@ describe("services", () => {
         storyType: "feature",
         state: "In Progress",
         estimate: 3,
+        role: "assigned",
+        completedAt: null,
+        owners: [],
         pullRequests: [],
       },
     ]);

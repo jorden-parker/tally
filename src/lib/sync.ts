@@ -1,25 +1,34 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Runner } from "@/lib/exec";
-import { filterToAllowList, isAllowed, uncountedRepos } from "@/lib/github/allow-list";
+import { filterToAllowList, uncountedRepos } from "@/lib/github/allow-list";
 import {
   fetchCreatedPrs,
   fetchMergedPrs,
   fetchOpenAuthoredPrs,
-  fetchReviewRequestedRepos,
+  fetchPullRequestsToReview,
+  type ReviewablePullRequest,
 } from "@/lib/github/pull-requests";
 import { fetchReviewedPrs } from "@/lib/github/reviews";
 import type { ShortcutGet } from "@/lib/shortcut/client";
+import { linkPullRequests } from "@/lib/shortcut/link";
 import {
   countInProgressStories,
   fetchAssignedStories,
   fetchCompletedStories,
+  fetchMemberNames,
   fetchMentionName,
+  fetchStoriesById,
   fetchWorkflowStateNames,
+  toTicket,
+  toWorkItem,
+  type StoryContext,
 } from "@/lib/shortcut/stories";
+import { storyIdsIn } from "@/lib/shortcut/story-refs";
 import { upsertEvents, type EventSource } from "@/lib/store/events";
 import { replaceOpenItems } from "@/lib/store/open-items";
+import { replacePullRequestReviews } from "@/lib/store/pull-request-reviews";
 import { loadSettings, recordSnapshots, saveSettings } from "@/lib/store/settings";
-import { replaceTickets } from "@/lib/store/tickets";
+import { replaceTickets, type Ticket } from "@/lib/store/tickets";
 import { upsertWorkDetails } from "@/lib/store/work";
 
 export const SYNC_WINDOW_DAYS = 60;
@@ -37,6 +46,12 @@ export type SyncResult = {
   errors: Partial<Record<EventSource, string>>;
   uncountedReviewRepos: string[];
 };
+
+type GitHubSync = { authored: ReviewablePullRequest[]; toReview: ReviewablePullRequest[] };
+
+type ShortcutSync = { assigned: Ticket[]; completed: Ticket[]; context: StoryContext };
+
+const NO_PULL_REQUESTS: GitHubSync = { authored: [], toReview: [] };
 
 function daysFrom(date: Date, days: number): Date {
   return new Date(date.getTime() + days * MILLISECONDS_PER_DAY);
@@ -57,18 +72,18 @@ function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
 async function syncGitHub(
   { db, run }: SyncDependencies,
   allowList: string[],
-  uncountedReviewRepos: string[],
+  result: SyncResult,
   now: Date,
-): Promise<void> {
+): Promise<GitHubSync> {
   const sinceDate = dayOf(daysFrom(now, -SYNC_WINDOW_DAYS));
   const results = await Promise.allSettled([
     fetchReviewedPrs(run, sinceDate),
     fetchCreatedPrs(run, sinceDate),
     fetchMergedPrs(run, sinceDate),
     fetchOpenAuthoredPrs(run),
-    fetchReviewRequestedRepos(run),
+    fetchPullRequestsToReview(run),
   ]);
-  const [reviewed, created, merged, openAuthored, requestedRepos] = results;
+  const [reviewed, created, merged, openAuthored, toReview] = results;
   const reviews = settledValue(reviewed, []);
   const mergedPrs = filterToAllowList(settledValue(merged, []), allowList);
   upsertEvents(db, [
@@ -76,44 +91,89 @@ async function syncGitHub(
     ...mergedPrs,
   ]);
   upsertWorkDetails(db, mergedPrs);
-  uncountedReviewRepos.push(...uncountedRepos(reviews, allowList));
+  result.uncountedReviewRepos.push(...uncountedRepos(reviews, allowList));
   if (openAuthored.status === "fulfilled") {
     const openPrs = filterToAllowList(openAuthored.value, allowList);
     replaceOpenItems(db, "github", openPrs);
     recordSnapshots(db, { openAuthoredPrs: openPrs.length }, now.toISOString());
   }
-  if (requestedRepos.status === "fulfilled") {
-    const allowedRepos = requestedRepos.value.filter((repo) => isAllowed(repo, allowList));
-    recordSnapshots(db, { reviewRequestedPrs: allowedRepos.length }, now.toISOString());
+  if (toReview.status === "fulfilled") {
+    const allowedPrs = filterToAllowList(toReview.value, allowList);
+    recordSnapshots(db, { reviewRequestedPrs: allowedPrs.length }, now.toISOString());
   }
-  const failure = results.find((result) => result.status === "rejected");
-  if (failure) throw failure.reason;
+  const pullRequests = {
+    authored: settledValue(openAuthored, []),
+    toReview: settledValue(toReview, []),
+  };
+  replacePullRequestReviews(
+    db,
+    [...pullRequests.authored, ...pullRequests.toReview].flatMap((pullRequest) =>
+      pullRequest.reviewStatus === null
+        ? []
+        : [{ url: pullRequest.url, status: pullRequest.reviewStatus }],
+    ),
+  );
+  const failure = results.find((settled) => settled.status === "rejected");
+  if (failure) result.errors.github = errorMessage(failure.reason);
+  return pullRequests;
 }
 
-async function syncShortcut({ db }: SyncDependencies, get: ShortcutGet, now: Date): Promise<void> {
+async function syncShortcut(
+  { db }: SyncDependencies,
+  get: ShortcutGet,
+  now: Date,
+): Promise<ShortcutSync> {
   const mentionName = await fetchMentionName(get);
   const window = {
     fromDay: dayOf(daysFrom(now, -SYNC_WINDOW_DAYS)),
     toDay: dayOf(daysFrom(now, 1)),
   };
-  const completed = await fetchCompletedStories(get, mentionName, window);
-  upsertEvents(db, completed);
-  upsertWorkDetails(db, completed);
+  const completedStories = await fetchCompletedStories(get, mentionName, window);
+  const completedWork = completedStories.map(toWorkItem);
+  upsertEvents(db, completedWork);
+  upsertWorkDetails(db, completedWork);
   const storiesInProgress = await countInProgressStories(get, mentionName);
   recordSnapshots(db, { storiesInProgress }, now.toISOString());
-  const stateNames = await fetchWorkflowStateNames(get);
-  replaceTickets(db, await fetchAssignedStories(get, mentionName, stateNames));
+  const context = {
+    stateNames: await fetchWorkflowStateNames(get),
+    memberNames: await fetchMemberNames(get),
+  };
+  return {
+    assigned: await fetchAssignedStories(get, mentionName, context),
+    completed: completedStories.map((story) => toTicket(story, "completed", context)),
+    context,
+  };
 }
 
-async function capture(
+function storyIdsToReview(toReview: ReviewablePullRequest[], known: Ticket[]): string[] {
+  const knownIds = new Set(known.map((ticket) => ticket.id));
+  const mentioned = toReview.flatMap((pullRequest) =>
+    storyIdsIn(`${pullRequest.headRefName} ${pullRequest.title}`),
+  );
+  return [...new Set(mentioned)].filter((id) => !knownIds.has(id));
+}
+
+async function storeTickets(
+  { db, shortcut }: SyncDependencies,
+  { assigned, completed, context }: ShortcutSync,
+  { authored, toReview }: GitHubSync,
+): Promise<void> {
+  const known = [...assigned, ...completed];
+  const reviewing = await fetchStoriesById(shortcut, storyIdsToReview(toReview, known), context);
+  const tickets = [...assigned, ...reviewing, ...completed];
+  replaceTickets(db, linkPullRequests(tickets, [...authored, ...toReview]));
+}
+
+async function capture<T>(
   errors: SyncResult["errors"],
   source: EventSource,
-  work: () => Promise<void>,
-): Promise<void> {
+  work: () => Promise<T>,
+): Promise<T | null> {
   try {
-    await work();
+    return await work();
   } catch (error) {
     errors[source] = errorMessage(error);
+    return null;
   }
 }
 
@@ -121,18 +181,22 @@ export async function syncAll(dependencies: SyncDependencies): Promise<SyncResul
   const { db, shortcut } = dependencies;
   const now = dependencies.now();
   const { allowList } = loadSettings(db);
-  const errors: SyncResult["errors"] = {};
-  const uncountedReviewRepos: string[] = [];
+  const result: SyncResult = { errors: {}, uncountedReviewRepos: [] };
 
-  await Promise.all([
+  const [github, stories] = await Promise.all([
     allowList.length > 0
-      ? capture(errors, "github", () =>
-          syncGitHub(dependencies, allowList, uncountedReviewRepos, now),
-        )
-      : undefined,
-    capture(errors, "shortcut", () => syncShortcut(dependencies, shortcut, now)),
+      ? capture(result.errors, "github", () => syncGitHub(dependencies, allowList, result, now))
+      : null,
+    capture(result.errors, "shortcut", () => syncShortcut(dependencies, shortcut, now)),
   ]);
+  if (stories !== null) {
+    await capture(result.errors, "shortcut", () =>
+      storeTickets(dependencies, stories, github ?? NO_PULL_REQUESTS),
+    );
+  }
 
-  if (Object.keys(errors).length === 0) saveSettings(db, { lastSyncedAt: now.toISOString() });
-  return { errors, uncountedReviewRepos };
+  if (Object.keys(result.errors).length === 0) {
+    saveSettings(db, { lastSyncedAt: now.toISOString() });
+  }
+  return result;
 }

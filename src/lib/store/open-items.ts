@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { EventSource } from "@/lib/store/events";
+import { reviewStatusJoin, toReviewStatus, type ReviewStatus } from "./pull-request-reviews";
 
 export type OpenItem = {
   source: EventSource;
@@ -9,6 +10,7 @@ export type OpenItem = {
   repo: string | null;
   title: string;
   url: string;
+  reviewStatus: ReviewStatus | null;
 };
 
 type OpenItemRow = {
@@ -19,6 +21,7 @@ type OpenItemRow = {
   repo: string | null;
   title: string;
   url: string;
+  review_status: string | null;
 };
 
 const DELETE_SOURCE = `DELETE FROM open_items WHERE source = ?`;
@@ -34,10 +37,12 @@ const INSERT_DRAFT = `INSERT INTO draft_items (source, external_id) VALUES (?, ?
 
 const ALL = `
   SELECT
-    open_items.source, open_items.external_id, opened_at, repo, title, url,
-    draft_items.external_id IS NOT NULL AS is_draft
+    open_items.source, open_items.external_id, opened_at, repo, title, open_items.url,
+    draft_items.external_id IS NOT NULL AS is_draft,
+    pull_request_reviews.status AS review_status
   FROM open_items
   LEFT JOIN draft_items USING (source, external_id)
+  ${reviewStatusJoin("open_items")}
   ORDER BY opened_at DESC, open_items.external_id ASC
 `;
 
@@ -50,6 +55,7 @@ function toOpenItem(row: OpenItemRow): OpenItem {
     repo: row.repo,
     title: row.title,
     url: row.url,
+    reviewStatus: toReviewStatus(row.review_status),
   };
 }
 

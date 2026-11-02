@@ -2,15 +2,29 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import type { DraftRow, WorkReport, WorkRow, WorkTotals } from "@/lib/metrics/work";
-import { formatCycleTime, prDetail, ticketDetail, workMarkdown } from "@/lib/metrics/work-markdown";
+import {
+  groupByDay,
+  type DraftRow,
+  type WorkReport,
+  type WorkRow,
+  type WorkTotals,
+} from "@/lib/metrics/work";
+import {
+  detailParts,
+  formatCycleTime,
+  leadSentence,
+  workMarkdown,
+} from "@/lib/metrics/work-markdown";
+import { REVIEW_STATUS_LABELS } from "@/lib/review-status";
 import { plural } from "@/lib/text";
 import { api as realApi, type TallyApi } from "../api";
+import { formatDayMonth, formatLongDay } from "../dashboard/format";
 import { useWorkLog } from "./use-work-log";
 
 const currentTime = () => new Date();
 
 const BUTTON_CLASS = "rounded-md border border-rule px-3 py-1.5 text-sm text-ink";
+const SEPARATOR = " · ";
 
 type WorkLogProps = { api?: TallyApi; now?: () => Date };
 
@@ -45,85 +59,152 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function coverageNotes({ prsWithoutSize, unestimatedTickets }: WorkTotals): string[] {
-  const notes = [];
-  if (prsWithoutSize > 0) {
-    notes.push(
-      `${plural(prsWithoutSize, "PR")} ${prsWithoutSize === 1 ? "has" : "have"} no size data.`,
-    );
-  }
-  if (unestimatedTickets > 0) {
-    notes.push(
-      `${plural(unestimatedTickets, "ticket")} ${unestimatedTickets === 1 ? "has" : "have"} no estimate.`,
-    );
-  }
-  return notes;
+function haveOrHas(count: number): string {
+  return count === 1 ? "has" : "have";
 }
 
-function Totals({ totals }: { totals: WorkTotals }) {
-  const types = totals.ticketsByType.map(({ key, count }) => `${count} ${key}`).join(", ");
+function TotalsBlock({
+  title,
+  notes,
+  children,
+}: {
+  title: string;
+  notes: string[];
+  children: ReactNode;
+}) {
   return (
-    <section aria-label="Totals" className="flex flex-col gap-3">
-      <dl className="grid grid-cols-2 gap-6 md:grid-cols-3">
-        <Stat label="PRs merged" value={String(totals.prsMerged)} />
-        <Stat label="Lines changed" value={`+${totals.additions} −${totals.deletions}`} />
-        <Stat label="Median PR cycle time" value={formatCycleTime(totals.medianPrCycleMs)} />
-        <Stat label="Tickets completed" value={String(totals.ticketsCompleted)} />
-        <Stat label="Points" value={String(totals.points)} />
-        <Stat
-          label="Median ticket cycle time"
-          value={formatCycleTime(totals.medianTicketCycleMs)}
-        />
-      </dl>
-      {types === "" ? null : <p className="text-sm text-ink-soft">{types}</p>}
-      {coverageNotes(totals).map((note) => (
+    <div role="group" aria-label={title} className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">{title}</h3>
+      <dl className="grid grid-cols-3 gap-6">{children}</dl>
+      {notes.map((note) => (
         <p key={note} className="text-sm text-ink-soft">
           {note}
         </p>
       ))}
+    </div>
+  );
+}
+
+function PullRequestTotals({ totals }: { totals: WorkTotals }) {
+  const notes =
+    totals.prsWithoutSize === 0
+      ? []
+      : [`${plural(totals.prsWithoutSize, "PR")} ${haveOrHas(totals.prsWithoutSize)} no size data`];
+  return (
+    <TotalsBlock title="Pull requests" notes={notes}>
+      <Stat label="Merged" value={String(totals.prsMerged)} />
+      <Stat label="Lines changed" value={`+${totals.additions} −${totals.deletions}`} />
+      <Stat label="Median cycle time" value={formatCycleTime(totals.medianPrCycleMs)} />
+    </TotalsBlock>
+  );
+}
+
+function TicketTotals({ totals }: { totals: WorkTotals }) {
+  const types = totals.ticketsByType.map(({ key, count }) => plural(count, key)).join(", ");
+  const notes = [
+    ...(types === "" ? [] : [types]),
+    ...(totals.unestimatedTickets === 0
+      ? []
+      : [
+          `${plural(totals.unestimatedTickets, "ticket")} ${haveOrHas(totals.unestimatedTickets)} no estimate`,
+        ]),
+  ];
+  return (
+    <TotalsBlock title="Tickets" notes={notes}>
+      <Stat label="Completed" value={String(totals.ticketsCompleted)} />
+      <Stat label="Points" value={String(totals.points)} />
+      <Stat label="Median cycle time" value={formatCycleTime(totals.medianTicketCycleMs)} />
+    </TotalsBlock>
+  );
+}
+
+function Totals({ totals }: { totals: WorkTotals }) {
+  return (
+    <section aria-label="Totals" className="grid grid-cols-1 gap-8 md:grid-cols-2">
+      <PullRequestTotals totals={totals} />
+      <TicketTotals totals={totals} />
     </section>
   );
 }
 
-function Row({ row, children }: { row: WorkRow | DraftRow; children: ReactNode }) {
+function RowLink({ row }: { row: WorkRow | DraftRow }) {
+  return (
+    <a
+      href={row.url}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium underline-offset-4 hover:underline"
+    >
+      {row.title}
+    </a>
+  );
+}
+
+function WorkRowItem({ row }: { row: WorkRow }) {
+  return (
+    <li className="flex flex-col gap-1">
+      <RowLink row={row} />
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-soft">
+        {detailParts(row).map((part) => (
+          <li key={part}>{part}</li>
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function draftLine(row: DraftRow): string {
+  const status = row.reviewStatus === null ? [] : [REVIEW_STATUS_LABELS[row.reviewStatus]];
+  return [`Opened ${formatLongDay(row.day)}`, row.repo, ...status]
+    .filter((part) => part !== null)
+    .join(SEPARATOR);
+}
+
+function DraftRowItem({ row }: { row: DraftRow }) {
   return (
     <li className="flex flex-col">
-      <a
-        href={row.url}
-        target="_blank"
-        rel="noreferrer"
-        className="font-medium underline-offset-4 hover:underline"
-      >
-        {row.title}
-      </a>
-      <span className="text-sm text-ink-soft">{children}</span>
+      <RowLink row={row} />
+      <span className="text-sm text-ink-soft">{draftLine(row)}</span>
     </li>
   );
 }
 
 function RowSection({
   title,
+  count,
   emptyText,
   children,
 }: {
   title: string;
+  count: number;
   emptyText: string;
-  children: ReactNode[];
+  children: ReactNode;
 }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-3">
-      <h2 className="font-semibold">{title}</h2>
-      {children.length === 0 ? (
-        <p className="text-ink-soft">{emptyText}</p>
-      ) : (
-        <ul className="flex flex-col gap-3">{children}</ul>
-      )}
+    <section aria-label={title} className="flex flex-col gap-4">
+      <h2 className="font-semibold">
+        {title} ({count})
+      </h2>
+      {count === 0 ? <p className="text-ink-soft">{emptyText}</p> : children}
     </section>
   );
 }
 
-function evidenceLine(row: WorkRow, detail: string): string {
-  return [row.day, row.repo, detail].filter((part) => part !== null).join(" · ");
+function DayGroups({ rows }: { rows: WorkRow[] }) {
+  return (
+    <div className="flex flex-col gap-6">
+      {groupByDay(rows).map(({ day, rows: dayRows }) => (
+        <div key={day} className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold text-ink-soft">{formatLongDay(day)}</h3>
+          <ul className="flex flex-col gap-3">
+            {dayRows.map((row) => (
+              <WorkRowItem key={row.externalId} row={row} />
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function ExportActions({ report }: { report: WorkReport }) {
@@ -159,30 +240,31 @@ function CopyButton({ text }: { text: string }) {
 function Report({ report }: { report: WorkReport }) {
   return (
     <>
+      <p className="text-ink-soft">
+        {leadSentence(report.totals)}, {formatDayMonth(report.from)} to {formatDayMonth(report.to)}
+      </p>
       <ExportActions report={report} />
       <Totals totals={report.totals} />
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-        <RowSection title="PRs merged" emptyText="Nothing in this period">
-          {report.prs.map((row) => (
-            <Row key={row.externalId} row={row}>
-              {evidenceLine(row, prDetail(row))}
-            </Row>
+      <RowSection title="PRs merged" count={report.prs.length} emptyText="Nothing in this period">
+        <DayGroups rows={report.prs} />
+      </RowSection>
+      <RowSection
+        title="Tickets completed"
+        count={report.tickets.length}
+        emptyText="Nothing in this period"
+      >
+        <DayGroups rows={report.tickets} />
+      </RowSection>
+      <RowSection
+        title="Drafts in progress"
+        count={report.drafts.length}
+        emptyText="No drafts in progress"
+      >
+        <ul className="flex flex-col gap-3">
+          {report.drafts.map((row) => (
+            <DraftRowItem key={row.externalId} row={row} />
           ))}
-        </RowSection>
-        <RowSection title="Tickets completed" emptyText="Nothing in this period">
-          {report.tickets.map((row) => (
-            <Row key={row.externalId} row={row}>
-              {evidenceLine(row, ticketDetail(row))}
-            </Row>
-          ))}
-        </RowSection>
-      </div>
-      <RowSection title="Draft PRs (current)" emptyText="No draft PRs">
-        {report.drafts.map((row) => (
-          <Row key={row.externalId} row={row}>
-            Opened {row.day} · {row.repo}
-          </Row>
-        ))}
+        </ul>
       </RowSection>
     </>
   );

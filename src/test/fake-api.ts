@@ -36,6 +36,7 @@ function makeOpenItem(
     repo,
     title,
     url: `https://example.test/${encodeURIComponent(title)}`,
+    reviewStatus: null,
   };
 }
 
@@ -48,6 +49,9 @@ export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     storyType: "feature",
     state: "In Progress",
     estimate: 3,
+    role: "assigned",
+    completedAt: null,
+    owners: [],
     pullRequests: [],
     ...overrides,
   };
@@ -70,7 +74,33 @@ export function makeSummary(overrides: Partial<Summary> = {}): Summary {
     open: {
       prs: [makeOpenItem("github", "Tidy the proxy", "acme/api")],
       tickets: [makeTicket()],
+      reviewing: [
+        makeTicket({
+          id: "77",
+          title: "Retry on timeout",
+          role: "reviewing",
+          owners: ["Ada", "Grace"],
+          pullRequests: [
+            {
+              url: "https://github.com/acme/api/pull/9",
+              title: "Retry on timeout",
+              isDraft: false,
+              isMerged: false,
+              reviewStatus: "awaiting_review",
+            },
+          ],
+        }),
+      ],
     },
+    completedTickets: [
+      makeTicket({
+        id: "21",
+        title: "Ship tally",
+        state: "Done",
+        role: "completed",
+        completedAt: "2026-10-29T09:00:00Z",
+      }),
+    ],
     lastSyncedAt: "2026-10-30T11:55:00Z",
     ...overrides,
   };

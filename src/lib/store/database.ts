@@ -57,6 +57,20 @@ const SCHEMA = `
     is_merged INTEGER NOT NULL,
     PRIMARY KEY (ticket_id, url)
   );
+  CREATE TABLE IF NOT EXISTS ticket_roles (
+    ticket_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL,
+    completed_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS ticket_owners (
+    ticket_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    PRIMARY KEY (ticket_id, name)
+  );
+  CREATE TABLE IF NOT EXISTS pull_request_reviews (
+    url TEXT PRIMARY KEY,
+    status TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

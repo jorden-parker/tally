@@ -1,9 +1,19 @@
+import { REVIEW_STATUS_LABELS } from "@/lib/review-status";
 import { plural } from "@/lib/text";
-import { cycleTimeMs, type DraftRow, type WorkReport, type WorkRow, type WorkTotals } from "./work";
+import {
+  cycleTimeMs,
+  groupByDay,
+  type DraftRow,
+  type WorkReport,
+  type WorkRow,
+  type WorkTotals,
+} from "./work";
 
 const HOUR_MS = 60 * 60 * 1000;
 const HOURS_BEFORE_DAYS = 48;
 const UNKNOWN = "—";
+const SEPARATOR = " · ";
+const PULL_REQUEST_URL = /\/pull\/(\d+)$/;
 
 export function formatCycleTime(milliseconds: number | null): string {
   if (milliseconds === null) return UNKNOWN;
@@ -13,13 +23,13 @@ export function formatCycleTime(milliseconds: number | null): string {
   return plural(Math.round(hours / 24), "day");
 }
 
-function joinKnown(parts: (string | null)[]): string {
-  return parts.filter((part) => part !== null).join(" · ") || UNKNOWN;
+export function prNumber(url: string): string | null {
+  const number = PULL_REQUEST_URL.exec(url)?.[1];
+  return number === undefined ? null : `#${number}`;
 }
 
-function sizeOf({ additions, deletions, changedFiles }: WorkRow): string | null {
-  if (additions === null || deletions === null || changedFiles === null) return null;
-  return `+${additions} −${deletions}, ${plural(changedFiles, "file")}`;
+function known(parts: (string | null)[]): string[] {
+  return parts.filter((part): part is string => part !== null);
 }
 
 function cycleOf(verb: string, row: WorkRow): string | null {
@@ -27,65 +37,101 @@ function cycleOf(verb: string, row: WorkRow): string | null {
   return cycleTime === null ? null : `${verb} in ${formatCycleTime(cycleTime)}`;
 }
 
-export function prDetail(row: WorkRow): string {
-  return joinKnown([sizeOf(row), cycleOf("merged", row)]);
+function sizeParts({ additions, deletions, changedFiles }: WorkRow): (string | null)[] {
+  if (additions === null || deletions === null || changedFiles === null) return [];
+  return [`+${additions} −${deletions}`, plural(changedFiles, "file")];
 }
 
-export function ticketDetail(row: WorkRow): string {
+function pullRequestParts(row: WorkRow): (string | null)[] {
+  return [row.repo, prNumber(row.url), ...sizeParts(row), cycleOf("merged", row)];
+}
+
+function ticketParts(row: WorkRow): (string | null)[] {
   const points = row.points === null ? null : plural(row.points, "point");
-  return joinKnown([row.storyType, points, cycleOf("finished", row)]);
+  return [`sc-${row.externalId}`, row.storyType, points, cycleOf("finished", row)];
+}
+
+export function detailParts(row: WorkRow): string[] {
+  return known(row.kind === "pr_merged" ? pullRequestParts(row) : ticketParts(row));
 }
 
 function link({ title, url }: { title: string; url: string }): string {
   return `[${title.replace(/[[\]]/g, "\\$&")}](${url})`;
 }
 
-function repoSuffix(repo: string | null): string {
-  return repo === null ? "" : ` (${repo})`;
-}
-
-function workLine(row: WorkRow, detail: string): string {
-  return `- ${row.day} ${link(row)}${repoSuffix(row.repo)}: ${detail}`;
+function workLine(row: WorkRow): string {
+  return `- ${[link(row), ...detailParts(row)].join(SEPARATOR)}`;
 }
 
 function draftLine(row: DraftRow): string {
-  return `- Opened ${row.day} ${link(row)}${repoSuffix(row.repo)}`;
+  const status = row.reviewStatus === null ? null : REVIEW_STATUS_LABELS[row.reviewStatus];
+  const parts = known([link(row), row.repo, `opened ${row.day}`, status?.toLowerCase() ?? null]);
+  return `- ${parts.join(SEPARATOR)}`;
+}
+
+function pullRequestTotals(totals: WorkTotals): string {
+  const size = `+${totals.additions} −${totals.deletions} across ${plural(totals.changedFiles, "file")}`;
+  return known([
+    `PRs merged: ${totals.prsMerged}`,
+    totals.prsMerged === 0 ? null : size,
+    medianOf(totals.medianPrCycleMs),
+  ]).join(SEPARATOR);
+}
+
+function ticketTotals(totals: WorkTotals): string {
+  const types = totals.ticketsByType.map(({ key, count }) => plural(count, key)).join(", ");
+  return known([
+    `Tickets completed: ${totals.ticketsCompleted}`,
+    totals.ticketsCompleted === 0 ? null : plural(totals.points, "point"),
+    types === "" ? null : types,
+    medianOf(totals.medianTicketCycleMs),
+  ]).join(SEPARATOR);
+}
+
+function medianOf(milliseconds: number | null): string | null {
+  return milliseconds === null ? null : `median cycle time ${formatCycleTime(milliseconds)}`;
+}
+
+function uncountedParts(totals: WorkTotals): string[] {
+  return known([
+    totals.prsWithoutSize === 0 ? null : `${plural(totals.prsWithoutSize, "PR")} without size data`,
+    totals.unestimatedTickets === 0
+      ? null
+      : `${plural(totals.unestimatedTickets, "ticket")} without an estimate`,
+  ]);
 }
 
 function summaryLines(totals: WorkTotals): string[] {
-  const size = `+${totals.additions} −${totals.deletions} across ${plural(totals.changedFiles, "file")}`;
-  const prNotes = [size];
-  if (totals.prsWithoutSize > 0) {
-    prNotes.push(`${plural(totals.prsWithoutSize, "PR")} without size data`);
-  }
-  const ticketNotes = [plural(totals.points, "point")];
-  if (totals.unestimatedTickets > 0) ticketNotes.push(`${totals.unestimatedTickets} unestimated`);
-  const types = totals.ticketsByType.map(({ key, count }) => `${count} ${key}`).join(", ");
+  const uncounted = uncountedParts(totals);
   return [
-    `- PRs merged: ${totals.prsMerged} (${prNotes.join(", ")})`,
-    `- Tickets completed: ${totals.ticketsCompleted} (${ticketNotes.join(", ")})`,
-    ...(types === "" ? [] : [`- Ticket types: ${types}`]),
-    `- Median cycle time: PRs ${formatCycleTime(totals.medianPrCycleMs)}, tickets ${formatCycleTime(totals.medianTicketCycleMs)}`,
+    `- ${pullRequestTotals(totals)}`,
+    `- ${ticketTotals(totals)}`,
+    ...(uncounted.length === 0 ? [] : [`- Not counted: ${uncounted.join(", ")}`]),
   ];
 }
 
-function section(title: string, lines: string[]): string {
-  return `## ${title}\n\n${lines.length === 0 ? "None" : lines.join("\n")}\n`;
+export function leadSentence(totals: WorkTotals): string {
+  return `${plural(totals.prsMerged, "PR")} merged and ${plural(totals.ticketsCompleted, "ticket")} completed`;
+}
+
+function section(title: string, body: string): string {
+  return `## ${title}\n\n${body === "" ? "None" : body}\n`;
+}
+
+function byDay(rows: WorkRow[]): string {
+  return groupByDay(rows)
+    .map(({ day, rows: dayRows }) => `### ${day}\n\n${dayRows.map(workLine).join("\n")}`)
+    .join("\n\n");
 }
 
 export function workMarkdown(report: WorkReport): string {
   const { from, to, totals, prs, tickets, drafts } = report;
   return [
     `# Work log: ${from} to ${to}\n`,
-    section("Summary", summaryLines(totals)),
-    section(
-      "PRs merged",
-      prs.map((row) => workLine(row, prDetail(row))),
-    ),
-    section(
-      "Tickets completed",
-      tickets.map((row) => workLine(row, ticketDetail(row))),
-    ),
-    section("Draft PRs (current)", drafts.map(draftLine)),
+    `${leadSentence(totals)}.\n`,
+    section("Summary", summaryLines(totals).join("\n")),
+    section(`PRs merged (${prs.length})`, byDay(prs)),
+    section(`Tickets completed (${tickets.length})`, byDay(tickets)),
+    section(`Drafts in progress (${drafts.length})`, drafts.map(draftLine).join("\n")),
   ].join("\n");
 }

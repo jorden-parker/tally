@@ -28,7 +28,8 @@ export type Summary = {
   previous: PeriodTotals;
   now: Snapshots;
   daily: DailyPoint[];
-  open: { prs: OpenItem[]; tickets: Ticket[] };
+  open: { prs: OpenItem[]; tickets: Ticket[]; reviewing: Ticket[] };
+  completedTickets: Ticket[];
   lastSyncedAt: string | null;
 };
 
@@ -59,6 +60,20 @@ export function openPullRequests(items: OpenItem[], allowList: string[]): OpenIt
     items.filter((item) => item.source === "github"),
     allowList,
   );
+}
+
+function withRole(tickets: Ticket[], role: Ticket["role"]): Ticket[] {
+  return tickets.filter((ticket) => ticket.role === role);
+}
+
+function completedIn(tickets: Ticket[], period: DayRange, timeZone: string): Ticket[] {
+  return withRole(tickets, "completed")
+    .filter(({ completedAt }) => {
+      if (completedAt === null) return false;
+      const day = dayKey(completedAt, timeZone);
+      return day >= period.from && day <= period.to;
+    })
+    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
 }
 
 function currentPeriod(input: SummaryInput, today: string): { current: DayRange; shift: number } {
@@ -124,8 +139,10 @@ export function summarize(input: SummaryInput): Summary {
     daily: dailyPoints(dated, today),
     open: {
       prs: openPullRequests(input.openItems, settings.allowList),
-      tickets: input.tickets,
+      tickets: withRole(input.tickets, "assigned"),
+      reviewing: withRole(input.tickets, "reviewing"),
     },
+    completedTickets: completedIn(input.tickets, current, settings.timeZone),
     lastSyncedAt: settings.lastSyncedAt,
   };
 }

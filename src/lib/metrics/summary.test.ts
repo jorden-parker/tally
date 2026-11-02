@@ -104,6 +104,7 @@ const OPEN_ITEMS: OpenItem[] = [
     repo: "acme/api",
     title: "Tidy the proxy",
     url: "https://github.com/acme/api/pull/9",
+    reviewStatus: null,
   },
   {
     source: "github",
@@ -113,20 +114,35 @@ const OPEN_ITEMS: OpenItem[] = [
     repo: "stranger/lib",
     title: "Elsewhere",
     url: "https://github.com/stranger/lib/pull/2",
+    reviewStatus: null,
   },
 ];
 
-const TICKETS: Ticket[] = [
-  {
-    id: "31",
-    title: "Plan the rollout",
-    url: "https://app.shortcut.com/acme/story/31",
+function ticket(id: string, overrides: Partial<Ticket> = {}): Ticket {
+  return {
+    id,
+    title: `Story ${id}`,
+    url: `https://app.shortcut.com/acme/story/${id}`,
     openedAt: "2026-10-10T09:00:00Z",
     storyType: "feature",
     state: "In Progress",
     estimate: 3,
+    role: "assigned",
+    completedAt: null,
+    owners: [],
     pullRequests: [],
-  },
+    ...overrides,
+  };
+}
+
+const TICKETS: Ticket[] = [ticket("31")];
+
+const COMPLETED: Ticket[] = [
+  ticket("1", { role: "completed", completedAt: "2026-10-30T09:00:00Z" }),
+  ticket("2", { role: "completed", completedAt: "2026-10-30T10:00:00Z" }),
+  ticket("3", { role: "completed", completedAt: "2026-10-28T10:00:00Z" }),
+  ticket("4", { role: "completed", completedAt: "2026-10-01T10:00:00Z" }),
+  ticket("5", { role: "completed", completedAt: "2026-10-30T23:30:00Z" }),
 ];
 
 describe("open work", () => {
@@ -150,6 +166,34 @@ describe("open work", () => {
 
     expect(summary.open.prs).toEqual([]);
     expect(summary.open.tickets).toHaveLength(1);
+  });
+
+  it("splits tickets by role, hiding reviewing and completed ones from my own", () => {
+    const tickets = [ticket("31"), ticket("77", { role: "reviewing" }), ...COMPLETED];
+    const summary = summarize({ ...input("day"), tickets });
+
+    expect(summary.open.tickets.map((item) => item.id)).toEqual(["31"]);
+    expect(summary.open.reviewing.map((item) => item.id)).toEqual(["77"]);
+  });
+
+  it("lists tickets completed in the current period, newest first", () => {
+    const completedIds = (range: SummaryInput["range"]) =>
+      summarize({ ...input(range), tickets: COMPLETED }).completedTickets.map((item) => item.id);
+
+    expect(completedIds("day")).toEqual(["5", "2", "1"]);
+    expect(completedIds("week")).toEqual(["5", "2", "1", "3"]);
+    expect(completedIds("30d")).toEqual(["5", "2", "1", "3", "4"]);
+  });
+
+  it("places a completion on its day in the configured time zone", () => {
+    const base = input("day");
+    const summary = summarize({
+      ...base,
+      tickets: COMPLETED,
+      settings: { ...base.settings, timeZone: "Pacific/Auckland" },
+    });
+
+    expect(summary.completedTickets.map((item) => item.id)).toEqual(["5"]);
   });
 
   it("reports the same open work for every range", () => {

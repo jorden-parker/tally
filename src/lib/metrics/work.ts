@@ -36,6 +36,18 @@ export type WorkReportInput = {
   period: DayRange;
 };
 
+export type DayGroup<Row> = { day: string; rows: Row[] };
+
+export function groupByDay<Row extends { day: string }>(rows: Row[]): DayGroup<Row>[] {
+  const groups: DayGroup<Row>[] = [];
+  for (const row of rows) {
+    const last = groups.at(-1);
+    if (last?.day === row.day) last.rows.push(row);
+    else groups.push({ day: row.day, rows: [row] });
+  }
+  return groups;
+}
+
 export function cycleTimeMs(item: WorkItem): number | null {
   if (item.startedAt === null) return null;
   return new Date(item.occurredAt).getTime() - new Date(item.startedAt).getTime();

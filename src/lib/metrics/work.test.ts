@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings } from "@/lib/store/settings";
 import type { WorkItem } from "@/lib/store/work";
-import { cycleTimeMs, workReport } from "./work";
+import { cycleTimeMs, groupByDay, workReport } from "./work";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -62,6 +62,7 @@ function draft(overrides: Partial<OpenItem> = {}): OpenItem {
     repo: "acme/api",
     title: "Work in progress",
     url: "https://github.com/acme/api/pull/8",
+    reviewStatus: null,
     ...overrides,
   };
 }
@@ -77,6 +78,25 @@ describe("cycleTimeMs", () => {
 
   it("is null when the start is unknown", () => {
     expect(cycleTimeMs(pr({ startedAt: null }))).toBeNull();
+  });
+});
+
+describe("groupByDay", () => {
+  it("groups rows under their day, keeping the order the rows came in", () => {
+    const rows = [
+      { day: "2026-10-29", id: "a" },
+      { day: "2026-10-29", id: "b" },
+      { day: "2026-10-27", id: "c" },
+    ];
+
+    expect(groupByDay(rows)).toEqual([
+      { day: "2026-10-29", rows: [rows[0], rows[1]] },
+      { day: "2026-10-27", rows: [rows[2]] },
+    ]);
+  });
+
+  it("is empty for no rows", () => {
+    expect(groupByDay([])).toEqual([]);
   });
 });
 
@@ -183,14 +203,14 @@ describe("workReport", () => {
     const result = report(
       [],
       [
-        draft({ openedAt: "2025-01-01T08:00:00Z" }),
+        draft({ openedAt: "2025-01-01T08:00:00Z", reviewStatus: "awaiting_review" }),
         draft({ externalId: "ready", isDraft: false }),
         draft({ externalId: "blocked", repo: "stranger/lib" }),
       ],
     );
 
-    expect(result.drafts.map((item) => [item.externalId, item.day])).toEqual([
-      ["draft", "2025-01-01"],
+    expect(result.drafts.map((item) => [item.externalId, item.day, item.reviewStatus])).toEqual([
+      ["draft", "2025-01-01", "awaiting_review"],
     ]);
     expect(result.totals.prsMerged).toBe(0);
   });

@@ -57,7 +57,16 @@ caches them on `globalThis`. Route handlers in `src/app/api` stay thin and call
   stored.
 - GitHub sync is skipped while the allow-list is empty.
 - Merged PRs come from a paged GraphQL search (`src/lib/github/search.ts`),
-  because `gh search prs` can't return PR size.
+  because `gh search prs` can't return PR size. Open PRs use the same search to
+  get `reviewDecision`, review counts and the branch name; my own open PRs and
+  the PRs waiting on my review (`review-requested:` plus `reviewed-by:` minus
+  those I last approved) both come back as `ReviewablePullRequest` with a
+  derived `reviewStatus`.
+- Tickets are stored in one `replaceTickets` after both sources settle: my
+  assigned stories, stories completed in the window, and stories behind PRs I am
+  reviewing. The last group's ids come from `storyIdsIn` over PR branch names
+  and titles (`sc-1234`), and `linkPullRequests` attaches any PR that names a
+  story Shortcut did not attach itself. Shortcut's own attachments win.
 - All remote access goes through `Runner` (`src/lib/exec.ts`): `gh` for GitHub
   and `short api` for Shortcut. `short` comes from `node_modules/.bin`, so start
   the server through `bun run`. The CLI uses its own `short install` credentials
@@ -73,18 +82,24 @@ point-in-time counts (open PRs, requested reviews, stories in progress) that
 have no history. `open_items` holds the current open PRs and assigned stories,
 replaced per source on each successful fetch. `draft_items` flags the open items
 that are drafts. `work_details` holds PR size, ticket points and type, and start
-times for completed work, keyed on `(source, external_id)`. New data that needs
-a new column goes in a new table, because `CREATE TABLE IF NOT EXISTS` can't
-alter an existing one.
+times for completed work, keyed on `(source, external_id)`. `tickets` and
+`ticket_pull_requests` hold the current ticket cards; `ticket_roles` says
+whether each is assigned, reviewing or completed (with `completed_at`) and
+`ticket_owners` names the owners. `pull_request_reviews` holds the review status
+per PR url and is joined onto open items and ticket PRs on read, never stored
+per ticket. New data that needs a new column goes in a new table, because
+`CREATE TABLE IF NOT EXISTS` can't alter an existing one.
 
 **Metrics.** `src/lib/metrics/summary.ts` `summarize` is a pure function of
 events, snapshots, settings, range and `now`. Nothing derived is stored. The
 allow-list is applied again here, so removing an entry hides already-synced
 events. Day and week boundaries come from `buckets.ts` using the configured time
-zone and week start. `src/lib/metrics/work.ts` `workReport` does the same for
-the work log, over any date range and not limited to the sync window. It leaves
-missing details out of totals rather than counting them as zero. Current drafts
-are listed whatever the range, because `open_items` has no history.
+zone and week start. `completedTickets` lists the completed role whose
+completion day falls in the current range. `src/lib/metrics/work.ts`
+`workReport` does the same for the work log, over any date range and not limited
+to the sync window. It leaves missing details out of totals rather than counting
+them as zero. Current drafts are listed whatever the range, because `open_items`
+has no history.
 
 **Frontend.** Pages are thin; logic lives in `src/components`. Components take
 optional `api` (`TallyApi`, `src/components/api.ts`) and `now` props that

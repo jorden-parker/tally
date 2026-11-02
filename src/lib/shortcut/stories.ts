@@ -1,4 +1,4 @@
-import type { Ticket, TicketPullRequest } from "@/lib/store/tickets";
+import type { Ticket, TicketPullRequest, TicketRole } from "@/lib/store/tickets";
 import type { WorkItem } from "@/lib/store/work";
 import type { ShortcutGet } from "./client";
 
@@ -12,7 +12,7 @@ type StoryPullRequest = {
   closed: boolean;
 };
 
-type Story = {
+export type Story = {
   id: number;
   name: string;
   app_url: string;
@@ -22,12 +22,24 @@ type Story = {
   started_at?: string | null;
   estimate?: number | null;
   story_type?: string;
+  owner_ids?: string[];
   pull_requests?: StoryPullRequest[];
+};
+
+export type CompletedStory = Story & { completed_at: string };
+
+export type StoryContext = {
+  stateNames: Map<number, string>;
+  memberNames: Map<string, string>;
 };
 
 type Workflow = { states: { id: number; name: string }[] };
 
+type Member = { id: string; profile: { name: string } };
+
 const WORKFLOWS_PATH = "/api/v3/workflows";
+const MEMBERS_PATH = "/api/v3/members";
+const STORIES_PATH = "/api/v3/stories";
 const UNKNOWN_STATE = "Unknown";
 
 type StorySearchPage = {
@@ -54,12 +66,16 @@ async function searchAllStories(get: ShortcutGet, query: string): Promise<Story[
   return stories;
 }
 
-function toWorkItem(story: Story, completedAt: string): WorkItem {
+function isCompleted(story: Story): story is CompletedStory {
+  return story.completed_at !== null;
+}
+
+export function toWorkItem(story: CompletedStory): WorkItem {
   return {
     source: "shortcut",
     kind: "story_completed",
     externalId: String(story.id),
-    occurredAt: completedAt,
+    occurredAt: story.completed_at,
     repo: null,
     title: story.name,
     url: story.app_url,
@@ -77,18 +93,21 @@ export async function fetchMentionName(get: ShortcutGet): Promise<string> {
   return member.mention_name;
 }
 
+export async function fetchMemberNames(get: ShortcutGet): Promise<Map<string, string>> {
+  const members = await get<Member[]>(MEMBERS_PATH);
+  return new Map(members.map((member) => [member.id, member.profile.name]));
+}
+
 export async function fetchCompletedStories(
   get: ShortcutGet,
   mentionName: string,
   window: DayWindow,
-): Promise<WorkItem[]> {
+): Promise<CompletedStory[]> {
   const stories = await searchAllStories(
     get,
     `owner:${mentionName} is:done completed:${window.fromDay}..${window.toDay}`,
   );
-  return stories.flatMap((story) =>
-    story.completed_at === null ? [] : [toWorkItem(story, story.completed_at)],
-  );
+  return stories.filter(isCompleted);
 }
 
 export async function countInProgressStories(
@@ -114,18 +133,29 @@ function toTicketPullRequests(pullRequests: StoryPullRequest[]): TicketPullReque
       title: pullRequest.title,
       isDraft: pullRequest.draft,
       isMerged: pullRequest.merged,
+      reviewStatus: null,
     }));
 }
 
-function toTicket(story: Story, stateNames: Map<number, string>): Ticket {
+function ownerNames(ownerIds: string[], memberNames: Map<string, string>): string[] {
+  return ownerIds.flatMap((id) => {
+    const name = memberNames.get(id);
+    return name === undefined ? [] : [name];
+  });
+}
+
+export function toTicket(story: Story, role: TicketRole, context: StoryContext): Ticket {
   return {
     id: String(story.id),
     title: story.name,
     url: story.app_url,
     openedAt: story.created_at,
     storyType: story.story_type ?? null,
-    state: stateNames.get(story.workflow_state_id) ?? UNKNOWN_STATE,
+    state: context.stateNames.get(story.workflow_state_id) ?? UNKNOWN_STATE,
     estimate: story.estimate ?? null,
+    role,
+    completedAt: story.completed_at,
+    owners: ownerNames(story.owner_ids ?? [], context.memberNames),
     pullRequests: toTicketPullRequests(story.pull_requests ?? []),
   };
 }
@@ -133,8 +163,19 @@ function toTicket(story: Story, stateNames: Map<number, string>): Ticket {
 export async function fetchAssignedStories(
   get: ShortcutGet,
   mentionName: string,
-  stateNames: Map<number, string>,
+  context: StoryContext,
 ): Promise<Ticket[]> {
   const stories = await searchAllStories(get, `owner:${mentionName} !is:done !is:archived`);
-  return stories.map((story) => toTicket(story, stateNames));
+  return stories.map((story) => toTicket(story, "assigned", context));
+}
+
+export async function fetchStoriesById(
+  get: ShortcutGet,
+  ids: string[],
+  context: StoryContext,
+): Promise<Ticket[]> {
+  const results = await Promise.allSettled(ids.map((id) => get<Story>(`${STORIES_PATH}/${id}`)));
+  return results.flatMap((result) =>
+    result.status === "fulfilled" ? [toTicket(result.value, "reviewing", context)] : [],
+  );
 }

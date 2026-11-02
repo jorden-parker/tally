@@ -1,6 +1,12 @@
 import type { Range } from "@/lib/metrics/summary";
 import { plural } from "@/lib/text";
 
+export const RANGE_LABELS: Record<Range, string> = {
+  day: "Today",
+  week: "This week",
+  "30d": "Last 30 days",
+};
+
 const COMPARISON_LABELS: Record<Range, string> = {
   day: "yesterday",
   week: "this point last week",
@@ -29,12 +35,32 @@ export function isStale(lastSyncedAt: string | null, now: Date, maxAgeMs: number
   return lastSyncedAt === null || now.getTime() - new Date(lastSyncedAt).getTime() > maxAgeMs;
 }
 
+export function rangePhrase(range: Range): string {
+  const label = RANGE_LABELS[range];
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
+function formatUtcDay(dayKey: string, options: Intl.DateTimeFormatOptions): string {
+  return new Date(`${dayKey}T00:00:00Z`).toLocaleDateString("en-GB", {
+    ...options,
+    timeZone: "UTC",
+  });
+}
+
 export function formatDay(dayKey: string): string {
   return new Date(`${dayKey}T00:00:00Z`).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
   });
+}
+
+export function formatDayMonth(dayKey: string): string {
+  return formatUtcDay(dayKey, { day: "numeric", month: "short" });
+}
+
+export function formatLongDay(dayKey: string): string {
+  return formatUtcDay(dayKey, { weekday: "short", day: "numeric", month: "short" });
 }
 
 export function formatSynced(lastSyncedAt: string | null, now: Date): string {

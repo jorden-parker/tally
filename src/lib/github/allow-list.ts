@@ -1,6 +1,6 @@
 import type { TallyEvent } from "@/lib/store/events";
 
-export function isAllowed(repo: string, allowList: string[]): boolean {
+function isAllowed(repo: string, allowList: string[]): boolean {
   const target = repo.toLowerCase();
   return allowList.some((entry) => {
     const allowed = entry.toLowerCase();

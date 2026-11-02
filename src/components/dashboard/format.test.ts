@@ -3,8 +3,11 @@ import {
   comparisonLabel,
   deltaText,
   formatDay,
+  formatDayMonth,
+  formatLongDay,
   formatSynced,
   isStale,
+  rangePhrase,
   tallyGroups,
 } from "./format";
 
@@ -68,5 +71,28 @@ describe("formatDay", () => {
   it("writes a day key as month and day without shifting time zones", () => {
     expect(formatDay("2026-10-11")).toBe("Oct 11");
     expect(formatDay("2026-01-01")).toBe("Jan 1");
+  });
+});
+
+describe("formatLongDay", () => {
+  it("writes a day key with its weekday, without shifting time zones", () => {
+    expect(formatLongDay("2026-10-29")).toBe("Thu 29 Oct");
+    expect(formatLongDay("2026-01-01")).toBe("Thu 1 Jan");
+  });
+});
+
+describe("formatDayMonth", () => {
+  it("writes a day key as day and month", () => {
+    expect(formatDayMonth("2026-10-01")).toBe("1 Oct");
+  });
+});
+
+describe("rangePhrase", () => {
+  it.each([
+    ["day", "today"],
+    ["week", "this week"],
+    ["30d", "last 30 days"],
+  ] as const)("phrases %s as %s", (range, expected) => {
+    expect(rangePhrase(range)).toBe(expected);
   });
 });

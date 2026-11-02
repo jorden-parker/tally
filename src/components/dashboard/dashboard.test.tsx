@@ -13,6 +13,8 @@ describe("Dashboard", () => {
     expect(await screen.findByRole("img", { name: "7 PRs reviewed" })).toBeDefined();
     expect(screen.getByRole("article", { name: "sc-31" })).toBeDefined();
     expect(screen.getByRole("region", { name: "Open PRs without a ticket" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Reviewing" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Completed this week" })).toBeDefined();
     expect(screen.getByRole("region", { name: "Daily activity" })).toBeDefined();
     expect(screen.queryByText("PRs reviewed", { selector: "h3" })).toBeNull();
     expect(screen.getByRole("button", { name: "This week" }).getAttribute("aria-pressed")).toBe(

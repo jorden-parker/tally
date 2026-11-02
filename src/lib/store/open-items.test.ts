@@ -12,6 +12,7 @@ function pullRequest(overrides: Partial<OpenItem> = {}): OpenItem {
     repo: "acme/api",
     title: "Add retries",
     url: "https://github.com/acme/api/pull/1",
+    reviewStatus: null,
     ...overrides,
   };
 }
@@ -25,6 +26,7 @@ function story(overrides: Partial<OpenItem> = {}): OpenItem {
     repo: null,
     title: "Plan the rollout",
     url: "https://app.shortcut.com/acme/story/31",
+    reviewStatus: null,
     ...overrides,
   };
 }

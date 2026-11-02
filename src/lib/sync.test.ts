@@ -20,22 +20,21 @@ function pullRequest(repo: string, number: number) {
   };
 }
 
+function searchPage(nodes: unknown[]): string {
+  return JSON.stringify({
+    data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+  });
+}
+
 function reviewSearchPage(): string {
   const reviewed = (repo: string, number: number, reviewUrl: string) => ({
     ...pullRequest(repo, number),
     reviews: { nodes: [{ url: reviewUrl, submittedAt: "2026-10-28T10:00:00Z" }] },
   });
-  return JSON.stringify({
-    data: {
-      search: {
-        pageInfo: { hasNextPage: false, endCursor: null },
-        nodes: [
-          reviewed("acme/api", 1, "review-allowed"),
-          reviewed("stranger/lib", 2, "review-blocked"),
-        ],
-      },
-    },
-  });
+  return searchPage([
+    reviewed("acme/api", 1, "review-allowed"),
+    reviewed("stranger/lib", 2, "review-blocked"),
+  ]);
 }
 
 function mergedSearchPage(): string {
@@ -47,98 +46,129 @@ function mergedSearchPage(): string {
     deletions: 30,
     changedFiles: 4,
   });
-  return JSON.stringify({
-    data: {
-      search: {
-        pageInfo: { hasNextPage: false, endCursor: null },
-        nodes: [merged("acme/api", 4), merged("stranger/lib", 8)],
-      },
-    },
-  });
+  return searchPage([merged("acme/api", 4), merged("stranger/lib", 8)]);
+}
+
+function openPullRequest(
+  repo: string,
+  number: number,
+  createdAt: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    ...pullRequest(repo, number),
+    createdAt,
+    isDraft: false,
+    headRefName: `branch-${number}`,
+    author: { login: "jorden-parker" },
+    reviewDecision: null,
+    reviews: { totalCount: 0 },
+    myReviews: { nodes: [] },
+    ...overrides,
+  };
+}
+
+const OPEN_AUTHORED = [
+  openPullRequest("acme/api", 5, "2026-10-20T08:00:00Z", {
+    reviewDecision: "APPROVED",
+    reviews: { totalCount: 1 },
+  }),
+  openPullRequest("acme/web", 6, "2026-10-22T08:00:00Z", { isDraft: true }),
+  openPullRequest("stranger/lib", 7, "2026-10-23T08:00:00Z", { isDraft: true }),
+];
+
+const TO_REVIEW = [
+  openPullRequest("acme/api", 9, "2026-10-24T08:00:00Z", {
+    headRefName: "ada/sc-77-retries",
+    author: { login: "ada" },
+  }),
+  openPullRequest("stranger/lib", 10, "2026-10-25T08:00:00Z", {
+    title: "Fix sc-31 flake",
+    author: { login: "grace" },
+    myReviews: { nodes: [{ state: "COMMENTED" }] },
+  }),
+];
+
+function searchOf(args: string[]): string {
+  return args.find((arg) => arg.startsWith("search="))?.slice("search=".length) ?? "";
 }
 
 function fakeGitHub(): { run: Runner; calls: string[][] } {
   const calls: string[][] = [];
   const run: Runner = async (_command, args) => {
     calls.push(args);
-    const joined = args.join(" ");
     if (args[0] === "api" && args[1] === "user") return "jorden-parker\n";
-    if (joined.includes("is:merged")) return mergedSearchPage();
-    if (args[0] === "api") return reviewSearchPage();
-    if (joined.includes("--created")) {
+    if (args.includes("--created")) {
       return JSON.stringify([{ ...pullRequest("acme/web", 3), createdAt: "2026-10-29T08:00:00Z" }]);
     }
-    if (joined.includes("--review-requested")) {
-      return JSON.stringify([
-        { repository: { nameWithOwner: "acme/api" } },
-        { repository: { nameWithOwner: "stranger/lib" } },
-      ]);
-    }
-    return JSON.stringify([
-      { ...pullRequest("acme/api", 5), createdAt: "2026-10-20T08:00:00Z", isDraft: false },
-      { ...pullRequest("acme/web", 6), createdAt: "2026-10-22T08:00:00Z", isDraft: true },
-      { ...pullRequest("stranger/lib", 7), createdAt: "2026-10-23T08:00:00Z", isDraft: true },
-    ]);
+    const search = searchOf(args);
+    if (search.includes("is:merged")) return mergedSearchPage();
+    if (search.includes("updated:")) return reviewSearchPage();
+    if (search.includes("review-requested:")) return searchPage(TO_REVIEW);
+    if (search.includes("reviewed-by:")) return searchPage([]);
+    return searchPage(OPEN_AUTHORED);
   };
   return { run, calls };
+}
+
+function isOpenAuthoredSearch(args: string[]): boolean {
+  return searchOf(args).startsWith("is:pr is:open author:");
 }
 
 function withOpenAuthoredPrs(openPrs: unknown[]): Runner {
   const { run } = fakeGitHub();
   return async (command, args) =>
-    args.join(" ").includes("--author @me --state open")
-      ? JSON.stringify(openPrs)
-      : run(command, args);
+    isOpenAuthoredSearch(args) ? searchPage(openPrs) : run(command, args);
 }
+
+function shortcutStory(id: number, name: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name,
+    app_url: `https://app.shortcut.com/acme/story/${id}`,
+    completed_at: null,
+    created_at: "2026-10-10T09:00:00Z",
+    workflow_state_id: 500,
+    story_type: "feature",
+    estimate: 3,
+    owner_ids: ["member-jorden"],
+    ...overrides,
+  };
+}
+
+const ASSIGNED_STORY = shortcutStory(31, "Plan the rollout", {
+  pull_requests: [
+    {
+      url: "https://github.com/acme/api/pull/5",
+      title: "Roll out",
+      draft: true,
+      merged: false,
+      closed: false,
+    },
+  ],
+});
+
+const COMPLETED_STORY = shortcutStory(21, "Ship tally", {
+  completed_at: "2026-10-29T09:00:00Z",
+  started_at: "2026-10-26T09:00:00Z",
+});
 
 const fakeShortcut: ShortcutGet = async <T>(path: string) => {
   if (path.endsWith("/member")) return { mention_name: "jorden" } as T;
-  if (path.endsWith("/workflows")) return [{ states: [{ id: 500, name: "In Progress" }] }] as T;
-  const query = new URL(path, "https://api.app.shortcut.com").searchParams.get("query") ?? "";
-  if (query.includes("!is:archived")) {
-    return {
-      data: [
-        {
-          id: 31,
-          name: "Plan the rollout",
-          app_url: "https://app.shortcut.com/acme/story/31",
-          completed_at: null,
-          created_at: "2026-10-10T09:00:00Z",
-          workflow_state_id: 500,
-          story_type: "feature",
-          estimate: 3,
-          pull_requests: [
-            {
-              url: "https://github.com/acme/api/pull/5",
-              title: "Roll out",
-              draft: true,
-              merged: false,
-              closed: false,
-            },
-          ],
-        },
-      ],
-      next: null,
-    } as T;
+  if (path.endsWith("/members")) {
+    return [
+      { id: "member-jorden", profile: { name: "Jorden" } },
+      { id: "member-ada", profile: { name: "Ada" } },
+    ] as T;
   }
-  return (
-    query.includes("is:started")
-      ? { data: [], next: null, total: 3 }
-      : {
-          data: [
-            {
-              id: 21,
-              name: "Ship tally",
-              app_url: "https://app.shortcut.com/acme/story/21",
-              completed_at: "2026-10-29T09:00:00Z",
-              started_at: "2026-10-26T09:00:00Z",
-              estimate: 3,
-              story_type: "feature",
-            },
-          ],
-          next: null,
-        }
-  ) as T;
+  if (path.endsWith("/workflows")) return [{ states: [{ id: 500, name: "In Progress" }] }] as T;
+  if (path.includes("/stories/77")) {
+    return shortcutStory(77, "Retry on timeout", { owner_ids: ["member-ada"] }) as T;
+  }
+  const query = new URL(path, "https://api.app.shortcut.com").searchParams.get("query") ?? "";
+  if (query.includes("!is:archived")) return { data: [ASSIGNED_STORY], next: null } as T;
+  if (query.includes("is:started")) return { data: [], next: null, total: 3 } as T;
+  return { data: [COMPLETED_STORY], next: null } as T;
 };
 
 describe("syncAll", () => {
@@ -157,6 +187,10 @@ describe("syncAll", () => {
     return loadOpenItems(db)
       .filter((item) => item.source === "github")
       .map((item) => item.externalId);
+  }
+
+  function ticketById(id: string) {
+    return loadTickets(db).find((ticket) => ticket.id === id);
   }
 
   it("stores size and timing for allowed merged PRs and completed stories", async () => {
@@ -204,7 +238,7 @@ describe("syncAll", () => {
     expect(loadSettings(db).lastSyncedAt).toBe(NOW.toISOString());
   });
 
-  it("stores my open PRs from allowed repos only, newest first", async () => {
+  it("stores my open PRs from allowed repos only, newest first, with their review status", async () => {
     const { run } = fakeGitHub();
 
     await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
@@ -213,15 +247,17 @@ describe("syncAll", () => {
       "https://github.com/acme/web/pull/6",
       "https://github.com/acme/api/pull/5",
     ]);
+    expect(loadOpenItems(db).map((item) => item.reviewStatus)).toEqual([
+      "awaiting_review",
+      "approved",
+    ]);
   });
 
   it("drops an open PR that is no longer returned on the next sync", async () => {
     const first = fakeGitHub().run;
     await syncAll({ db, run: first, shortcut: fakeShortcut, now: () => NOW });
 
-    const second = withOpenAuthoredPrs([
-      { ...pullRequest("acme/api", 5), createdAt: "2026-10-20T08:00:00Z" },
-    ]);
+    const second = withOpenAuthoredPrs([openPullRequest("acme/api", 5, "2026-10-20T08:00:00Z")]);
     await syncAll({ db, run: second, shortcut: fakeShortcut, now: () => NOW });
 
     expect(storedOpenPrUrls()).toEqual(["https://github.com/acme/api/pull/5"]);
@@ -232,7 +268,7 @@ describe("syncAll", () => {
     await syncAll({ db, run: healthy, shortcut: fakeShortcut, now: () => NOW });
 
     const failing: Runner = async (command, args) => {
-      if (args.join(" ").includes("--author @me --state open")) throw new Error("search failed");
+      if (isOpenAuthoredSearch(args)) throw new Error("search failed");
       return healthy(command, args);
     };
     const result = await syncAll({ db, run: failing, shortcut: fakeShortcut, now: () => NOW });
@@ -250,12 +286,11 @@ describe("syncAll", () => {
     await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
 
     const created = calls.find((args) => args.includes("--created")) ?? [];
-    const merged = calls.find((args) => args.join(" ").includes("is:merged")) ?? [];
-    const reviews = calls.find((args) => args[1] === "graphql") ?? [];
+    const searches = calls.map(searchOf);
     expect(created).toContain(">=2026-08-31");
-    expect(merged.join(" ")).toContain("merged:>=2026-08-31");
-    expect(reviews).toContain(
-      "search=is:pr reviewed-by:jorden-parker -author:jorden-parker updated:>=2026-08-31",
+    expect(searches).toContain("is:pr author:jorden-parker is:merged merged:>=2026-08-31");
+    expect(searches).toContain(
+      "is:pr reviewed-by:jorden-parker -author:jorden-parker updated:>=2026-08-31",
     );
   });
 
@@ -293,13 +328,18 @@ describe("syncAll", () => {
 
     expect(result.errors).toEqual({ github: "gh exploded" });
     expect(storedEvents().map((event) => event.kind)).toEqual(["story_completed"]);
+    expect(
+      loadTickets(db)
+        .map((ticket) => ticket.role)
+        .sort(),
+    ).toEqual(["assigned", "completed"]);
     expect(loadSettings(db).lastSyncedAt).toBeNull();
   });
 
   it("keeps reviews when another GitHub call fails", async () => {
     const { run: healthyGitHub } = fakeGitHub();
     const run: Runner = async (command, args) => {
-      if (args.join(" ").includes("is:merged")) throw new Error("merged search failed");
+      if (searchOf(args).includes("is:merged")) throw new Error("merged search failed");
       return healthyGitHub(command, args);
     };
 
@@ -310,31 +350,75 @@ describe("syncAll", () => {
     expect(loadSettings(db).lastSyncedAt).toBeNull();
   });
 
-  it("stores my assigned stories from Shortcut as tickets, not open items", async () => {
+  it("stores my assigned stories as tickets with the review status of their PRs", async () => {
     const { run } = fakeGitHub();
 
     await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
 
-    expect(loadTickets(db)).toEqual([
-      {
-        id: "31",
-        title: "Plan the rollout",
-        url: "https://app.shortcut.com/acme/story/31",
-        openedAt: "2026-10-10T09:00:00Z",
-        storyType: "feature",
-        state: "In Progress",
-        estimate: 3,
-        pullRequests: [
-          {
-            url: "https://github.com/acme/api/pull/5",
-            title: "Roll out",
-            isDraft: true,
-            isMerged: false,
-          },
-        ],
-      },
-    ]);
+    expect(ticketById("31")).toMatchObject({
+      id: "31",
+      title: "Plan the rollout",
+      url: "https://app.shortcut.com/acme/story/31",
+      openedAt: "2026-10-10T09:00:00Z",
+      storyType: "feature",
+      state: "In Progress",
+      estimate: 3,
+      role: "assigned",
+      completedAt: null,
+      owners: ["Jorden"],
+      pullRequests: [
+        {
+          url: "https://github.com/acme/api/pull/5",
+          title: "Roll out",
+          isDraft: true,
+          isMerged: false,
+          reviewStatus: "approved",
+        },
+        { url: "https://github.com/stranger/lib/pull/10" },
+      ],
+    });
     expect(loadOpenItems(db).every((item) => item.source === "github")).toBe(true);
+  });
+
+  it("stores completed stories as tickets with their completion time", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(ticketById("21")).toMatchObject({
+      role: "completed",
+      completedAt: "2026-10-29T09:00:00Z",
+    });
+  });
+
+  it("stores stories behind PRs awaiting my review as reviewing tickets, whatever the repo", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(ticketById("77")).toMatchObject({
+      role: "reviewing",
+      owners: ["Ada"],
+      pullRequests: [
+        {
+          url: "https://github.com/acme/api/pull/9",
+          title: "PR 9",
+          isDraft: false,
+          isMerged: false,
+          reviewStatus: "awaiting_review",
+        },
+      ],
+    });
+    expect(ticketById("31")?.pullRequests.map((pullRequest) => pullRequest.url)).toEqual([
+      "https://github.com/acme/api/pull/5",
+      "https://github.com/stranger/lib/pull/10",
+    ]);
+    expect(ticketById("31")?.pullRequests[1]?.reviewStatus).toBe("in_review");
+    expect(
+      loadTickets(db)
+        .map((ticket) => ticket.id)
+        .sort(),
+    ).toEqual(["21", "31", "77"]);
   });
 
   it("keeps the open PRs and the stored stories when Shortcut fails", async () => {
@@ -351,7 +435,22 @@ describe("syncAll", () => {
       "https://github.com/acme/web/pull/6",
       "https://github.com/acme/api/pull/5",
     ]);
-    expect(loadTickets(db)).toHaveLength(1);
+    expect(loadTickets(db)).toHaveLength(3);
+  });
+
+  it("reports a failure while fetching the stories under review", async () => {
+    const { run } = fakeGitHub();
+    const shortcut: ShortcutGet = async <T>(path: string) => {
+      if (path.includes("/stories/")) throw new Error("stories down");
+      return fakeShortcut<T>(path);
+    };
+    const withoutStoryFetch = fakeGitHub().run;
+    await syncAll({ db, run: withoutStoryFetch, shortcut: fakeShortcut, now: () => NOW });
+
+    const result = await syncAll({ db, run, shortcut, now: () => NOW });
+
+    expect(result.errors.shortcut).toBeUndefined();
+    expect(ticketById("77")).toBeUndefined();
   });
 
   it("names repos whose reviews the allow-list dropped", async () => {

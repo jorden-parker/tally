@@ -1,6 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { Summary } from "@/lib/metrics/summary";
 import type { OpenItem } from "@/lib/store/open-items";
+import type { Ticket, TicketPullRequest } from "@/lib/store/tickets";
 import { makeSummary, makeTicket } from "@/test/fake-api";
 import { TicketCards } from "./ticket-cards";
 
@@ -21,20 +23,49 @@ function openPr(number: number, overrides: Partial<OpenItem> = {}): OpenItem {
     repo: "acme/api",
     title: `PR ${number}`,
     url: `https://github.com/acme/api/pull/${number}`,
+    reviewStatus: null,
     ...overrides,
   };
 }
 
-const PULL_REQUEST = {
+const PULL_REQUEST: TicketPullRequest = {
   url: "https://github.com/acme/api/pull/9",
   title: "Roll out",
   isDraft: false,
   isMerged: false,
+  reviewStatus: null,
 };
+
+function renderCards({
+  prs = [],
+  tickets = [],
+  reviewing = [],
+  completedTickets = [],
+  range = "week",
+}: Partial<Summary["open"]> & Partial<Pick<Summary, "completedTickets" | "range">>) {
+  return render(
+    <TicketCards
+      open={{ prs, tickets, reviewing }}
+      completedTickets={completedTickets}
+      range={range}
+    />,
+  );
+}
+
+function withStatus(id: string, reviewStatus: TicketPullRequest["reviewStatus"]): Ticket {
+  return makeTicket({ id, pullRequests: [{ ...PULL_REQUEST, reviewStatus }] });
+}
 
 describe("TicketCards", () => {
   it("shows the id, type, state, estimate and a link for each ticket", () => {
-    render(<TicketCards open={makeSummary().open} />);
+    const summary = makeSummary();
+    render(
+      <TicketCards
+        open={summary.open}
+        completedTickets={summary.completedTickets}
+        range={summary.range}
+      />,
+    );
 
     const ticket = card("31");
     expect(within(ticket).getByText("sc-31")).toBeDefined();
@@ -48,7 +79,7 @@ describe("TicketCards", () => {
   });
 
   it("says a ticket has no PR yet", () => {
-    render(<TicketCards open={{ prs: [], tickets: [makeTicket()] }} />);
+    renderCards({ tickets: [makeTicket()] });
 
     expect(within(card("31")).getByText("No PR yet")).toBeDefined();
   });
@@ -60,12 +91,46 @@ describe("TicketCards", () => {
       makeTicket({ id: "3", pullRequests: [{ ...PULL_REQUEST, isMerged: true }] }),
     ];
 
-    render(<TicketCards open={{ prs: [], tickets }} />);
+    renderCards({ tickets });
 
     const draft = within(card("1")).getByRole("link", { name: "Draft PR" });
     expect(draft.getAttribute("href")).toBe("https://github.com/acme/api/pull/9");
     expect(within(card("2")).getByRole("link", { name: "PR open" })).toBeDefined();
     expect(within(card("3")).getByRole("link", { name: "PR merged" })).toBeDefined();
+  });
+
+  it("labels my PRs with their review status", () => {
+    renderCards({
+      tickets: [
+        withStatus("1", "awaiting_review"),
+        withStatus("2", "in_review"),
+        withStatus("3", "changes_requested"),
+        withStatus("4", "approved"),
+      ],
+    });
+
+    expect(within(card("1")).getByRole("link", { name: "Awaiting review" })).toBeDefined();
+    expect(within(card("2")).getByRole("link", { name: "In review" })).toBeDefined();
+    expect(within(card("3")).getByRole("link", { name: "Changes requested" })).toBeDefined();
+    expect(within(card("4")).getByRole("link", { name: "Approved" })).toBeDefined();
+  });
+
+  it("prefers the draft and merged labels over the review status", () => {
+    renderCards({
+      tickets: [
+        makeTicket({
+          id: "1",
+          pullRequests: [{ ...PULL_REQUEST, isDraft: true, reviewStatus: "approved" }],
+        }),
+        makeTicket({
+          id: "2",
+          pullRequests: [{ ...PULL_REQUEST, isMerged: true, reviewStatus: "approved" }],
+        }),
+      ],
+    });
+
+    expect(within(card("1")).getByRole("link", { name: "Draft PR" })).toBeDefined();
+    expect(within(card("2")).getByRole("link", { name: "PR merged" })).toBeDefined();
   });
 
   it("lists one line per PR when a ticket has several", () => {
@@ -75,34 +140,34 @@ describe("TicketCards", () => {
       }),
     ];
 
-    render(<TicketCards open={{ prs: [], tickets }} />);
+    renderCards({ tickets });
 
     expect(within(card("31")).getByRole("link", { name: "PR open" })).toBeDefined();
     expect(within(card("31")).getByRole("link", { name: "PR merged" })).toBeDefined();
   });
 
   it("leaves out the estimate and type when Shortcut has none", () => {
-    render(
-      <TicketCards
-        open={{ prs: [], tickets: [makeTicket({ estimate: null, storyType: null })] }}
-      />,
-    );
+    renderCards({ tickets: [makeTicket({ estimate: null, storyType: null })] });
 
     expect(within(card("31")).queryByText(/points?/)).toBeNull();
     expect(within(card("31")).queryByText("Feature")).toBeNull();
   });
 
   it("singularises a one-point estimate", () => {
-    render(<TicketCards open={{ prs: [], tickets: [makeTicket({ estimate: 1 })] }} />);
+    renderCards({ tickets: [makeTicket({ estimate: 1 })] });
 
     expect(within(card("31")).getByText("1 point")).toBeDefined();
   });
 
-  it("lists open PRs that no ticket links to, marking drafts", () => {
+  it("lists open PRs that no ticket links to, with their draft flag and review status", () => {
     const tickets = [makeTicket({ pullRequests: [PULL_REQUEST] })];
-    const prs = [openPr(9), openPr(4, { isDraft: true }), openPr(5)];
+    const prs = [
+      openPr(9),
+      openPr(4, { isDraft: true }),
+      openPr(5, { reviewStatus: "changes_requested" }),
+    ];
 
-    render(<TicketCards open={{ prs, tickets }} />);
+    renderCards({ prs, tickets });
 
     const unlinked = section("Open PRs without a ticket");
     expect(unlinked.tagName).toBe("SECTION");
@@ -112,20 +177,82 @@ describe("TicketCards", () => {
         .map((link) => link.textContent),
     ).toEqual(["PR 4", "PR 5"]);
     expect(within(unlinked).getAllByText("Draft")).toHaveLength(1);
+    expect(within(unlinked).getByText("Changes requested")).toBeDefined();
     expect(within(unlinked).getAllByText("acme/api")).toHaveLength(2);
   });
 
   it("omits the unlinked list when every open PR belongs to a ticket", () => {
     const tickets = [makeTicket({ pullRequests: [PULL_REQUEST] })];
 
-    render(<TicketCards open={{ prs: [openPr(9)], tickets }} />);
+    renderCards({ prs: [openPr(9)], tickets });
 
     expect(screen.queryByRole("region", { name: "Open PRs without a ticket" })).toBeNull();
   });
 
   it("says when there are no tickets", () => {
-    render(<TicketCards open={{ prs: [], tickets: [] }} />);
+    renderCards({});
 
     expect(within(section("Your tickets")).getByText("No tickets assigned to you")).toBeDefined();
+  });
+
+  describe("reviewing", () => {
+    function reviewing(id: string, reviewStatus: TicketPullRequest["reviewStatus"]): Ticket {
+      return makeTicket({
+        id,
+        role: "reviewing",
+        owners: ["Ada", "Grace"],
+        pullRequests: [{ ...PULL_REQUEST, reviewStatus }],
+      });
+    }
+
+    it("shows other people's tickets with their owners and the status from my side", () => {
+      renderCards({
+        reviewing: [
+          reviewing("1", "awaiting_review"),
+          reviewing("2", "in_review"),
+          reviewing("3", "changes_requested"),
+        ],
+      });
+
+      const region = section("Reviewing");
+      expect(within(region).getAllByText("Owned by Ada, Grace")).toHaveLength(3);
+      expect(within(card("1")).getByRole("link", { name: "Awaiting your review" })).toBeDefined();
+      expect(within(card("2")).getByRole("link", { name: "You are reviewing" })).toBeDefined();
+      expect(within(card("3")).getByRole("link", { name: "You requested changes" })).toBeDefined();
+    });
+
+    it("says when nothing is waiting", () => {
+      renderCards({});
+
+      expect(
+        within(section("Reviewing")).getByText("Nothing waiting for your review"),
+      ).toBeDefined();
+    });
+  });
+
+  describe("completed", () => {
+    const completed = makeTicket({
+      id: "21",
+      role: "completed",
+      state: "Done",
+      completedAt: "2026-10-29T12:00:00Z",
+    });
+
+    it("names the range in the heading and dates each card", () => {
+      renderCards({ completedTickets: [completed], range: "week" });
+
+      const region = section("Completed this week");
+      expect(within(region).getByRole("heading", { name: "Completed this week" })).toBeDefined();
+      expect(within(card("21")).getByText("Completed Thu 29 Oct")).toBeDefined();
+    });
+
+    it.each([
+      ["day", "Nothing completed today"],
+      ["30d", "Nothing completed last 30 days"],
+    ] as const)("says when nothing was completed for %s", (range, text) => {
+      renderCards({ range });
+
+      expect(screen.getByText(text)).toBeDefined();
+    });
   });
 });

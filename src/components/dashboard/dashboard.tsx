@@ -5,16 +5,10 @@ import { RANGES, type Range, type Summary } from "@/lib/metrics/summary";
 import type { Settings } from "@/lib/store/settings";
 import { api as realApi, type TallyApi } from "../api";
 import { DailyChart } from "./daily-chart";
-import { formatSynced } from "./format";
+import { formatSynced, RANGE_LABELS } from "./format";
 import { StatLedger } from "./stat-ledger";
 import { TicketCards } from "./ticket-cards";
 import { useDashboard } from "./use-dashboard";
-
-const RANGE_LABELS: Record<Range, string> = {
-  day: "Today",
-  week: "This week",
-  "30d": "Last 30 days",
-};
 
 const currentTime = () => new Date();
 
@@ -69,7 +63,11 @@ function Report({ summary }: { summary: Summary }) {
   return (
     <>
       <StatLedger summary={summary} />
-      <TicketCards open={summary.open} />
+      <TicketCards
+        open={summary.open}
+        completedTickets={summary.completedTickets}
+        range={summary.range}
+      />
       <section aria-label="Daily activity" className="flex flex-col gap-3">
         <h2 className="font-semibold">Last four weeks</h2>
         <DailyChart points={summary.daily} />
