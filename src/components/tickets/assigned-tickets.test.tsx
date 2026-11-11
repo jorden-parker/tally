@@ -93,4 +93,16 @@ describe("AssignedTickets", () => {
 
     expect((await screen.findByRole("alert")).textContent).toContain("boom");
   });
+
+  it("renders Markdown in story titles", async () => {
+    render(
+      <AssignedTickets
+        api={fakeApi({
+          fetchAssignedStories: async () => [makeAssignedStory({ title: "Fix `parse` crash" })],
+        })}
+      />,
+    );
+
+    expect((await screen.findByText("parse")).tagName).toBe("CODE");
+  });
 });

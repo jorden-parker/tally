@@ -271,4 +271,21 @@ describe("TicketCards", () => {
       expect(screen.getByText(text)).toBeDefined();
     });
   });
+
+  it("renders Markdown in ticket, linked PR and unlinked PR titles", () => {
+    renderCards({
+      tickets: [
+        makeTicket({
+          id: "7",
+          title: "Rename `userId`",
+          pullRequests: [{ ...PULL_REQUEST, title: "Drop **legacy** table" }],
+        }),
+      ],
+      prs: [openPr(12, { title: "Bump `zod`" })],
+    });
+
+    expect(within(card("7")).getByText("userId").tagName).toBe("CODE");
+    expect(within(card("7")).getByText("legacy").tagName).toBe("STRONG");
+    expect(within(section("Open PRs without a ticket")).getByText("zod").tagName).toBe("CODE");
+  });
 });

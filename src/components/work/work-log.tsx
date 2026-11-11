@@ -29,6 +29,7 @@ import { plural } from "@/lib/text";
 import { api as realApi, type TallyApi } from "../api";
 import { formatDayMonth, formatLongDay } from "../dashboard/format";
 import { useWorkLog } from "./use-work-log";
+import { InlineMarkdown } from "@/components/inline-markdown";
 
 const currentTime = () => new Date();
 
@@ -149,7 +150,7 @@ function RowLink({ row }: { row: WorkRow | DraftRow }) {
       rel="noreferrer"
       className="font-medium underline-offset-4 hover:underline"
     >
-      {row.title}
+      <InlineMarkdown text={row.title} />
     </a>
   );
 }

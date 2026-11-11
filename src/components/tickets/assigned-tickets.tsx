@@ -29,6 +29,7 @@ import type { AssignedStory } from "@/lib/store/assigned-stories";
 import { api as realApi, type TallyApi } from "../api";
 import { formatLongDay } from "../dashboard/format";
 import { useAssignedTickets } from "./use-assigned-tickets";
+import { InlineMarkdown } from "@/components/inline-markdown";
 
 const SEPARATOR = " · ";
 const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -62,7 +63,7 @@ function StoryRow({ story }: { story: AssignedStory }) {
           rel="noreferrer"
           className="font-medium underline-offset-4 hover:underline"
         >
-          {story.title}
+          <InlineMarkdown text={story.title} />
         </a>
         <span className="text-sm text-muted-foreground">
           <span className="font-mono text-xs">sc-{story.id}</span>

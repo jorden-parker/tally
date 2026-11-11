@@ -206,4 +206,17 @@ describe("WorkLog", () => {
     expect(download.getAttribute("download")).toBe("work-log-2026-10-01-to-2026-10-30.md");
     expect(decodeURIComponent(download.getAttribute("href") ?? "")).toContain("## PRs merged (1)");
   });
+
+  it("renders Markdown in row titles", async () => {
+    const report = makeWorkReport();
+    const fetchWork = async () => ({
+      ...report,
+      prs: [makeWorkRow("pr_merged", "Upgrade `next` to *16*")],
+    });
+
+    render(<WorkLog api={fakeApi({ fetchWork })} now={now} />);
+
+    expect((await screen.findByText("next")).tagName).toBe("CODE");
+    expect(screen.getByText("16").tagName).toBe("EM");
+  });
 });

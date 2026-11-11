@@ -8,6 +8,7 @@ import type { OpenItem } from "@/lib/store/open-items";
 import type { ReviewStatus } from "@/lib/store/pull-request-reviews";
 import type { Ticket, TicketPullRequest } from "@/lib/store/tickets";
 import { formatLongDay, rangePhrase } from "./format";
+import { InlineMarkdown } from "@/components/inline-markdown";
 
 type StatusLabels = Record<ReviewStatus, string>;
 
@@ -78,7 +79,7 @@ function PullRequestStatus({
             rel="noreferrer"
             className="underline-offset-4 hover:underline"
           >
-            {pullRequest.title}
+            <InlineMarkdown text={pullRequest.title} />
           </a>
           <span className="font-mono text-xs text-muted-foreground">
             {pullRequestReference(pullRequest.url)} · {pullRequestStatus(pullRequest, labels)}
@@ -113,7 +114,7 @@ function TicketCard({ ticket, labels }: { ticket: Ticket; labels: StatusLabels }
         </CardHeader>
         <CardContent className="flex flex-1 flex-col gap-2">
           <a href={ticket.url} target="_blank" rel="noreferrer" className={TITLE_LINK_CLASS}>
-            {ticket.title}
+            <InlineMarkdown text={ticket.title} />
           </a>
           {ticket.role === "reviewing" ? (
             <span className="text-sm text-muted-foreground">
@@ -166,7 +167,7 @@ function UnlinkedPullRequest({ item }: { item: OpenItem }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
       <a href={item.url} target="_blank" rel="noreferrer" className={TITLE_LINK_CLASS}>
-        {item.title}
+        <InlineMarkdown text={item.title} />
       </a>
       {item.isDraft ? <Badge variant="secondary">Draft</Badge> : null}
       {item.reviewStatus === null ? null : (
