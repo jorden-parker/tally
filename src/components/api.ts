@@ -1,5 +1,6 @@
 import type { DayRange, Range, Summary } from "@/lib/metrics/summary";
 import type { WorkReport } from "@/lib/metrics/work";
+import type { AssignedStory } from "@/lib/store/assigned-stories";
 import type { Settings } from "@/lib/store/settings";
 import type { SyncResult } from "@/lib/sync";
 
@@ -8,6 +9,7 @@ export type SettingsChanges = Partial<Pick<Settings, "allowList" | "weekStart" |
 export type TallyApi = {
   fetchSummary: (range: Range) => Promise<Summary>;
   fetchWork: (period: DayRange) => Promise<WorkReport>;
+  fetchAssignedStories: () => Promise<AssignedStory[]>;
   fetchSettings: () => Promise<Settings>;
   runSync: () => Promise<SyncResult>;
   saveSettings: (changes: SettingsChanges) => Promise<Settings>;
@@ -33,6 +35,7 @@ function sendJson(method: string, body: unknown): RequestInit {
 export const api: TallyApi = {
   fetchSummary: (range) => request(`/api/metrics?range=${range}`),
   fetchWork: ({ from, to }) => request(`/api/work?from=${from}&to=${to}`),
+  fetchAssignedStories: () => request("/api/tickets"),
   fetchSettings: () => request("/api/settings"),
   runSync: () => request("/api/sync", sendJson("POST", {})),
   saveSettings: (changes) => request("/api/settings", sendJson("PUT", changes)),

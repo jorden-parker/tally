@@ -31,6 +31,13 @@ describe("Dashboard", () => {
     expect(link.getAttribute("href")).toBe("/work");
   });
 
+  it("links to every assigned ticket", async () => {
+    render(<Dashboard api={fakeApi()} now={now} />);
+
+    const link = await screen.findByRole("link", { name: "All my tickets" });
+    expect(link.getAttribute("href")).toBe("/tickets");
+  });
+
   it("loads the chosen range", async () => {
     const fetchSummary = vi.fn(async (range) => makeSummary({ range }));
     render(<Dashboard api={fakeApi({ fetchSummary })} now={now} />);

@@ -4,6 +4,7 @@ import { InvalidSettingsError, type Services } from "@/lib/server/services";
 const services = vi.hoisted(() => ({
   summary: vi.fn(),
   work: vi.fn(),
+  assignedStories: vi.fn(),
   sync: vi.fn(),
   settings: vi.fn(),
   updateSettings: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("@/lib/server/default-services", () => ({
 import { GET as getMetrics } from "./metrics/route";
 import { GET as getSettings, PUT as putSettings } from "./settings/route";
 import { POST as postSync } from "./sync/route";
+import { GET as getTickets } from "./tickets/route";
 import { GET as getWork } from "./work/route";
 
 function jsonRequest(body: unknown, method = "PUT"): Request {
@@ -50,6 +52,16 @@ describe("api routes", () => {
 
       expect(response.status).toBe(400);
       expect(services.work).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("GET /api/tickets", () => {
+    it("returns the assigned stories", async () => {
+      services.assignedStories.mockReturnValue([{ id: "31" }]);
+
+      const response = await getTickets();
+
+      expect(await response.json()).toEqual([{ id: "31" }]);
     });
   });
 

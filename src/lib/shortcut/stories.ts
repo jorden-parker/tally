@@ -1,3 +1,4 @@
+import type { AssignedStory, WorkflowStateType } from "@/lib/store/assigned-stories";
 import type { Ticket, TicketPullRequest, TicketRole } from "@/lib/store/tickets";
 import type { WorkItem } from "@/lib/store/work";
 import type { ShortcutGet } from "./client";
@@ -28,12 +29,16 @@ export type Story = {
 
 export type CompletedStory = Story & { completed_at: string };
 
+export type WorkflowState = { name: string; type: WorkflowStateType; position: number };
+
+export type WorkflowStates = Map<number, WorkflowState>;
+
 export type StoryContext = {
-  stateNames: Map<number, string>;
+  states: WorkflowStates;
   memberNames: Map<string, string>;
 };
 
-type Workflow = { states: { id: number; name: string }[] };
+type Workflow = { states: (WorkflowState & { id: number })[] };
 
 type Member = { id: string; profile: { name: string } };
 
@@ -118,11 +123,33 @@ export async function countInProgressStories(
   return page.total ?? page.data.length;
 }
 
-export async function fetchWorkflowStateNames(get: ShortcutGet): Promise<Map<number, string>> {
+export async function fetchWorkflowStates(get: ShortcutGet): Promise<WorkflowStates> {
   const workflows = await get<Workflow[]>(WORKFLOWS_PATH);
   return new Map(
-    workflows.flatMap((workflow) => workflow.states.map((state) => [state.id, state.name])),
+    workflows.flatMap((workflow) =>
+      workflow.states.map(({ id, name, type, position }) => [id, { name, type, position }]),
+    ),
   );
+}
+
+export function isOpenStory(story: Story, states: WorkflowStates): boolean {
+  return states.get(story.workflow_state_id)?.type !== "done";
+}
+
+export function toAssignedStory(story: Story, states: WorkflowStates): AssignedStory {
+  const state = states.get(story.workflow_state_id);
+  return {
+    id: String(story.id),
+    title: story.name,
+    url: story.app_url,
+    openedAt: story.created_at,
+    completedAt: story.completed_at,
+    storyType: story.story_type ?? null,
+    estimate: story.estimate ?? null,
+    state: state?.name ?? UNKNOWN_STATE,
+    stateType: state?.type ?? null,
+    statePosition: state?.position ?? null,
+  };
 }
 
 function toTicketPullRequests(pullRequests: StoryPullRequest[]): TicketPullRequest[] {
@@ -151,7 +178,7 @@ export function toTicket(story: Story, role: TicketRole, context: StoryContext):
     url: story.app_url,
     openedAt: story.created_at,
     storyType: story.story_type ?? null,
-    state: context.stateNames.get(story.workflow_state_id) ?? UNKNOWN_STATE,
+    state: context.states.get(story.workflow_state_id)?.name ?? UNKNOWN_STATE,
     estimate: story.estimate ?? null,
     role,
     completedAt: story.completed_at,
@@ -160,13 +187,8 @@ export function toTicket(story: Story, role: TicketRole, context: StoryContext):
   };
 }
 
-export async function fetchAssignedStories(
-  get: ShortcutGet,
-  mentionName: string,
-  context: StoryContext,
-): Promise<Ticket[]> {
-  const stories = await searchAllStories(get, `owner:${mentionName} !is:done !is:archived`);
-  return stories.map((story) => toTicket(story, "assigned", context));
+export async function fetchOwnedStories(get: ShortcutGet, mentionName: string): Promise<Story[]> {
+  return searchAllStories(get, `owner:${mentionName} !is:archived`);
 }
 
 export async function fetchStoriesById(

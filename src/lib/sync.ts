@@ -13,17 +13,20 @@ import type { ShortcutGet } from "@/lib/shortcut/client";
 import { linkPullRequests, type PullRequestsByRole } from "@/lib/shortcut/link";
 import {
   countInProgressStories,
-  fetchAssignedStories,
   fetchCompletedStories,
   fetchMemberNames,
   fetchMentionName,
+  fetchOwnedStories,
   fetchStoriesById,
-  fetchWorkflowStateNames,
+  fetchWorkflowStates,
+  isOpenStory,
+  toAssignedStory,
   toTicket,
   toWorkItem,
   type StoryContext,
 } from "@/lib/shortcut/stories";
 import { storyIdsIn } from "@/lib/shortcut/story-refs";
+import { replaceAssignedStories } from "@/lib/store/assigned-stories";
 import { upsertEvents, type EventSource } from "@/lib/store/events";
 import { replaceOpenItems } from "@/lib/store/open-items";
 import { replacePullRequestReviews } from "@/lib/store/pull-request-reviews";
@@ -136,11 +139,18 @@ async function syncShortcut(
   const storiesInProgress = await countInProgressStories(get, mentionName);
   recordSnapshots(db, { storiesInProgress }, now.toISOString());
   const context = {
-    stateNames: await fetchWorkflowStateNames(get),
+    states: await fetchWorkflowStates(get),
     memberNames: await fetchMemberNames(get),
   };
+  const owned = await fetchOwnedStories(get, mentionName);
+  replaceAssignedStories(
+    db,
+    owned.map((story) => toAssignedStory(story, context.states)),
+  );
   return {
-    assigned: await fetchAssignedStories(get, mentionName, context),
+    assigned: owned
+      .filter((story) => isOpenStory(story, context.states))
+      .map((story) => toTicket(story, "assigned", context)),
     completed: completedStories.map((story) => toTicket(story, "completed", context)),
     context,
   };

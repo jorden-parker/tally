@@ -25,6 +25,13 @@ describe("api", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/work?from=2026-10-01&to=2026-10-30", undefined);
   });
 
+  it("fetches the assigned stories", async () => {
+    respond([{ id: "31" }]);
+
+    expect(await api.fetchAssignedStories()).toEqual([{ id: "31" }]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/tickets", undefined);
+  });
+
   it("fetches the summary for a range", async () => {
     respond({ range: "day" });
 

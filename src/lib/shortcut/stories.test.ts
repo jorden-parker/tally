@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { ShortcutGet } from "./client";
 import {
   countInProgressStories,
-  fetchAssignedStories,
   fetchCompletedStories,
   fetchMemberNames,
   fetchMentionName,
+  fetchOwnedStories,
   fetchStoriesById,
-  fetchWorkflowStateNames,
+  fetchWorkflowStates,
+  isOpenStory,
+  toAssignedStory,
   toTicket,
   toWorkItem,
   type StoryContext,
@@ -25,7 +27,10 @@ function story(id: number, completedAt: string | null) {
 }
 
 const CONTEXT: StoryContext = {
-  stateNames: new Map([[500, "In Progress"]]),
+  states: new Map([
+    [500, { name: "In Progress", type: "started", position: 2 }],
+    [501, { name: "Done", type: "done", position: 3 }],
+  ]),
   memberNames: new Map([
     ["m-1", "Ada"],
     ["m-2", "Grace"],
@@ -228,61 +233,47 @@ describe("countInProgressStories", () => {
   });
 });
 
-describe("fetchWorkflowStateNames", () => {
-  it("maps every state id across every workflow to its name", async () => {
+describe("fetchWorkflowStates", () => {
+  it("maps every state id across every workflow to its name, type and position", async () => {
     const paths: string[] = [];
     const get: ShortcutGet = async <T>(path: string) => {
       paths.push(path);
       return [
         {
           states: [
-            { id: 500, name: "In Progress" },
-            { id: 501, name: "Done" },
+            { id: 500, name: "In Progress", type: "started", position: 2 },
+            { id: 501, name: "Done", type: "done", position: 3 },
           ],
         },
-        { states: [{ id: 600, name: "Backlog" }] },
+        { states: [{ id: 600, name: "Backlog", type: "backlog", position: 0 }] },
       ] as T;
     };
 
-    const names = await fetchWorkflowStateNames(get);
+    const states = await fetchWorkflowStates(get);
 
     expect(paths).toEqual(["/api/v3/workflows"]);
-    expect(names).toEqual(
+    expect(states).toEqual(
       new Map([
-        [500, "In Progress"],
-        [501, "Done"],
-        [600, "Backlog"],
+        [500, { name: "In Progress", type: "started", position: 2 }],
+        [501, { name: "Done", type: "done", position: 3 }],
+        [600, { name: "Backlog", type: "backlog", position: 0 }],
       ]),
     );
   });
 });
 
-describe("fetchAssignedStories", () => {
-  it("searches my unfinished, unarchived stories and maps them to assigned tickets", async () => {
+describe("fetchOwnedStories", () => {
+  it("searches every unarchived story I own, finished or not", async () => {
     const paths: string[] = [];
     const get: ShortcutGet = async <T>(path: string) => {
       paths.push(path);
-      return { data: [{ ...story(31, null), owner_ids: ["m-1"] }], next: null } as T;
+      return { data: [story(31, null)], next: null } as T;
     };
 
-    const tickets = await fetchAssignedStories(get, "jorden", CONTEXT);
+    const stories = await fetchOwnedStories(get, "jorden");
 
-    expect(queryOf(paths[0])).toBe("owner:jorden !is:done !is:archived");
-    expect(tickets).toEqual([
-      {
-        id: "31",
-        title: "Story 31",
-        url: "https://app.shortcut.com/acme/story/31",
-        openedAt: "2026-10-01T09:00:00Z",
-        storyType: null,
-        state: "In Progress",
-        estimate: null,
-        role: "assigned",
-        completedAt: null,
-        owners: ["Ada"],
-        pullRequests: [],
-      },
-    ]);
+    expect(queryOf(paths[0])).toBe("owner:jorden !is:archived");
+    expect(stories.map((owned) => owned.id)).toEqual([31]);
   });
 
   it("follows the next link so stories past the first page are included", async () => {
@@ -296,10 +287,52 @@ describe("fetchAssignedStories", () => {
       ) as T;
     };
 
-    const tickets = await fetchAssignedStories(get, "jorden", CONTEXT);
+    const stories = await fetchOwnedStories(get, "jorden");
 
     expect(paths[1]).toBe("/api/v3/search/stories?next=abc");
-    expect(tickets.map((ticket) => ticket.id)).toEqual(["1", "2"]);
+    expect(stories.map((owned) => owned.id)).toEqual([1, 2]);
+  });
+});
+
+describe("isOpenStory", () => {
+  it("is open unless the story sits in a done workflow state", () => {
+    expect(isOpenStory(story(1, null), CONTEXT.states)).toBe(true);
+    expect(isOpenStory({ ...story(2, null), workflow_state_id: 501 }, CONTEXT.states)).toBe(false);
+    expect(isOpenStory({ ...story(3, null), workflow_state_id: 999 }, CONTEXT.states)).toBe(true);
+  });
+});
+
+describe("toAssignedStory", () => {
+  it("carries the workflow state name, type and position", () => {
+    const owned = {
+      ...story(31, "2026-10-20T09:00:00Z"),
+      workflow_state_id: 501,
+      story_type: "bug",
+      estimate: 2,
+    };
+
+    expect(toAssignedStory(owned, CONTEXT.states)).toEqual({
+      id: "31",
+      title: "Story 31",
+      url: "https://app.shortcut.com/acme/story/31",
+      openedAt: "2026-10-01T09:00:00Z",
+      completedAt: "2026-10-20T09:00:00Z",
+      storyType: "bug",
+      estimate: 2,
+      state: "Done",
+      stateType: "done",
+      statePosition: 3,
+    });
+  });
+
+  it("names a state missing from the workflows Unknown, with no type", () => {
+    const owned = { ...story(31, null), workflow_state_id: 999 };
+
+    expect(toAssignedStory(owned, CONTEXT.states)).toMatchObject({
+      state: "Unknown",
+      stateType: null,
+      statePosition: null,
+    });
   });
 });
 

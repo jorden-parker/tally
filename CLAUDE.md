@@ -62,6 +62,10 @@ caches them on `globalThis`. Route handlers in `src/app/api` stay thin and call
   the PRs waiting on my review (`review-requested:` plus `reviewed-by:` minus
   those I last approved) both come back as `ReviewablePullRequest` with a
   derived `reviewStatus`.
+- One `owner:<me> !is:archived` search fetches every story I own. All of them go
+  to `assigned_stories` with their workflow state name, type (`backlog`,
+  `unstarted`, `started`, `done`, from `/api/v3/workflows`) and position; the
+  ones not in a `done` state become my assigned ticket cards.
 - Tickets are stored in one `replaceTickets` after both sources settle: my
   assigned stories, stories completed in the window, and stories behind PRs I am
   reviewing. The last group's ids come from `storyIdsIn` over PR branch names
@@ -85,9 +89,10 @@ that are drafts. `work_details` holds PR size, ticket points and type, and start
 times for completed work, keyed on `(source, external_id)`. `tickets` and
 `ticket_pull_requests` hold the current ticket cards; `ticket_roles` says
 whether each is assigned, reviewing or completed (with `completed_at`) and
-`ticket_owners` names the owners. `pull_request_reviews` holds the review status
-per PR url and is joined onto open items and ticket PRs on read, never stored
-per ticket. New data that needs a new column goes in a new table, because
+`ticket_owners` names the owners. `assigned_stories` holds every unarchived
+story I own, for the `/tickets` page. `pull_request_reviews` holds the review
+status per PR url and is joined onto open items and ticket PRs on read, never
+stored per ticket. New data that needs a new column goes in a new table, because
 `CREATE TABLE IF NOT EXISTS` can't alter an existing one.
 
 **Metrics.** `src/lib/metrics/summary.ts` `summarize` is a pure function of
@@ -105,7 +110,9 @@ has no history.
 optional `api` (`TallyApi`, `src/components/api.ts`) and `now` props that
 default to the real implementations, and `src/test/fake-api.ts` provides the
 test double. `/work` renders `src/components/work/work-log.tsx`, which exports
-Markdown from `src/lib/metrics/work-markdown.ts`. `use-dashboard.ts` owns
+Markdown from `src/lib/metrics/work-markdown.ts`. `/tickets` renders
+`src/components/tickets/assigned-tickets.tsx`, which filters and groups by
+status through `src/lib/metrics/status-groups.ts`. `use-dashboard.ts` owns
 dashboard state and triggers one automatic sync per load when data is older than
 10 minutes.
 

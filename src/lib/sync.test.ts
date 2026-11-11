@@ -4,6 +4,7 @@ import type { Runner } from "@/lib/exec";
 import type { ShortcutGet } from "@/lib/shortcut/client";
 import { openDatabase } from "@/lib/store/database";
 import { eventsBetween } from "@/lib/store/events";
+import { loadAssignedStories } from "@/lib/store/assigned-stories";
 import { loadOpenItems } from "@/lib/store/open-items";
 import { loadSettings, loadSnapshots, saveSettings } from "@/lib/store/settings";
 import { loadTickets } from "@/lib/store/tickets";
@@ -167,6 +168,11 @@ const COMPLETED_STORY = shortcutStory(21, "Ship tally", {
   started_at: "2026-10-26T09:00:00Z",
 });
 
+const FINISHED_STORY = shortcutStory(41, "Old chore", {
+  workflow_state_id: 501,
+  completed_at: "2026-03-01T09:00:00Z",
+});
+
 const fakeShortcut: ShortcutGet = async <T>(path: string) => {
   if (path.endsWith("/member")) return { mention_name: "jorden" } as T;
   if (path.endsWith("/members")) {
@@ -175,12 +181,23 @@ const fakeShortcut: ShortcutGet = async <T>(path: string) => {
       { id: "member-ada", profile: { name: "Ada" } },
     ] as T;
   }
-  if (path.endsWith("/workflows")) return [{ states: [{ id: 500, name: "In Progress" }] }] as T;
+  if (path.endsWith("/workflows")) {
+    return [
+      {
+        states: [
+          { id: 500, name: "In Progress", type: "started", position: 2 },
+          { id: 501, name: "Done", type: "done", position: 3 },
+        ],
+      },
+    ] as T;
+  }
   if (path.includes("/stories/77")) {
     return shortcutStory(77, "Retry on timeout", { owner_ids: ["member-ada"] }) as T;
   }
   const query = new URL(path, "https://api.app.shortcut.com").searchParams.get("query") ?? "";
-  if (query.includes("!is:archived")) return { data: [ASSIGNED_STORY], next: null } as T;
+  if (query.includes("!is:archived")) {
+    return { data: [ASSIGNED_STORY, FINISHED_STORY], next: null } as T;
+  }
   if (query.includes("is:started")) return { data: [], next: null, total: 3 } as T;
   return { data: [COMPLETED_STORY], next: null } as T;
 };
@@ -221,6 +238,28 @@ describe("syncAll", () => {
       "2026-10-26T09:00:00Z",
       "2026-10-25T16:00:00Z",
     ]);
+  });
+
+  it("stores every story I own with its workflow state, finished ones included", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(
+      loadAssignedStories(db).map((story) => [story.id, story.state, story.stateType]),
+    ).toEqual([
+      ["31", "In Progress", "started"],
+      ["41", "Done", "done"],
+    ]);
+  });
+
+  it("keeps finished stories off my open tickets", async () => {
+    const { run } = fakeGitHub();
+
+    await syncAll({ db, run, shortcut: fakeShortcut, now: () => NOW });
+
+    expect(ticketById("41")).toBeUndefined();
+    expect(ticketById("31")?.role).toBe("assigned");
   });
 
   it("stores which allowed open PRs are drafts", async () => {

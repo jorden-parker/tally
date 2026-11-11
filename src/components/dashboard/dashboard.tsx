@@ -97,6 +97,9 @@ export function Dashboard({ api = realApi, now = currentTime }: DashboardProps) 
           >
             {syncing ? "Counting sheep…" : "Sync now"}
           </button>
+          <Link href="/tickets" className="wobble underline underline-offset-4">
+            All my tickets
+          </Link>
           <Link href="/work" className="wobble underline underline-offset-4">
             Work log
           </Link>

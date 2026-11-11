@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DatabaseSync } from "node:sqlite";
+import { replaceAssignedStories } from "@/lib/store/assigned-stories";
 import { openDatabase } from "@/lib/store/database";
 import { upsertEvents } from "@/lib/store/events";
 import { replaceOpenItems } from "@/lib/store/open-items";
@@ -75,6 +76,24 @@ describe("services", () => {
 
     expect(summary.current.created).toBe(1);
     expect(summary.range).toBe("day");
+  });
+
+  it("lists the stored assigned stories", () => {
+    const story = {
+      id: "31",
+      title: "Plan the rollout",
+      url: "https://app.shortcut.com/acme/story/31",
+      openedAt: "2026-10-10T09:00:00Z",
+      completedAt: null,
+      storyType: "feature",
+      estimate: 3,
+      state: "In Progress",
+      stateType: "started" as const,
+      statePosition: 2,
+    };
+    replaceAssignedStories(db, [story]);
+
+    expect(services(db).assignedStories()).toEqual([story]);
   });
 
   it("includes the stored open PRs and assigned tickets in the summary", () => {

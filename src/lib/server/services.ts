@@ -2,6 +2,7 @@ import { z } from "zod";
 import { shiftDay } from "@/lib/metrics/buckets";
 import { summarize, type DayRange, type Range, type Summary } from "@/lib/metrics/summary";
 import { workReport, type WorkReport } from "@/lib/metrics/work";
+import { loadAssignedStories, type AssignedStory } from "@/lib/store/assigned-stories";
 import { eventsBetween } from "@/lib/store/events";
 import { loadOpenItems } from "@/lib/store/open-items";
 import { loadTickets } from "@/lib/store/tickets";
@@ -12,6 +13,7 @@ import { SYNC_WINDOW_DAYS, syncAll, type SyncDependencies, type SyncResult } fro
 export type Services = {
   summary: (range: Range) => Summary;
   work: (period: DayRange) => WorkReport;
+  assignedStories: () => AssignedStory[];
   sync: () => Promise<SyncResult>;
   settings: () => Settings;
   updateSettings: (input: unknown) => Settings;
@@ -86,6 +88,7 @@ export function createServices(dependencies: SyncDependencies): Services {
         settings: loadSettings(db),
         period,
       }),
+    assignedStories: () => loadAssignedStories(db),
     sync: () => syncAll(dependencies),
     settings,
     updateSettings: (input) => {

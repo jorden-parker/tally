@@ -1,6 +1,7 @@
 import type { TallyApi } from "@/components/api";
 import type { DailyPoint, DayRange, Summary } from "@/lib/metrics/summary";
 import type { WorkReport, WorkRow } from "@/lib/metrics/work";
+import type { AssignedStory } from "@/lib/store/assigned-stories";
 import type { TallyEvent } from "@/lib/store/events";
 import type { OpenItem } from "@/lib/store/open-items";
 import type { Settings } from "@/lib/store/settings";
@@ -53,6 +54,22 @@ export function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     completedAt: null,
     owners: [],
     pullRequests: [],
+    ...overrides,
+  };
+}
+
+export function makeAssignedStory(overrides: Partial<AssignedStory> = {}): AssignedStory {
+  return {
+    id: "31",
+    title: "Plan the rollout",
+    url: "https://app.shortcut.com/acme/story/31",
+    openedAt: "2026-10-10T09:00:00Z",
+    completedAt: null,
+    storyType: "feature",
+    estimate: 3,
+    state: "In Progress",
+    stateType: "started",
+    statePosition: 3,
     ...overrides,
   };
 }
@@ -157,6 +174,7 @@ export function fakeApi(overrides: Partial<TallyApi> = {}): TallyApi {
   return {
     fetchSummary: async (range) => makeSummary({ range }),
     fetchWork: async (period) => makeWorkReport(period),
+    fetchAssignedStories: async () => [makeAssignedStory()],
     fetchSettings: async () => makeSettings(),
     runSync: async () => ({ errors: {}, uncountedReviewRepos: [] }),
     saveSettings: async () => makeSettings(),

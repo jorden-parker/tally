@@ -67,6 +67,18 @@ const SCHEMA = `
     name TEXT NOT NULL,
     PRIMARY KEY (ticket_id, name)
   );
+  CREATE TABLE IF NOT EXISTS assigned_stories (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    opened_at TEXT NOT NULL,
+    completed_at TEXT,
+    story_type TEXT,
+    estimate REAL,
+    state TEXT NOT NULL,
+    state_type TEXT,
+    state_position INTEGER
+  );
   CREATE TABLE IF NOT EXISTS pull_request_reviews (
     url TEXT PRIMARY KEY,
     status TEXT NOT NULL
