@@ -18,7 +18,19 @@ bun run typecheck
 bun run lint
 bun run fallow                                 # dead code and duplication
 bun run verify                                 # test, typecheck, lint, fallow, build
+bun run browser:check                          # load every page in headless Chrome
+bun run browser:check /work --screenshots dir  # chosen paths, screenshots in dir
 ```
+
+`browser:check` is how to verify the app in a browser. The request gate answers
+403 to navigation from the Claude in Chrome extension, so don't use the
+extension and don't loosen the gate. The script (`scripts/browser-check`) drives
+the installed Google Chrome through `playwright-core`, signs in with the token
+from the data directory, and for each path prints the HTTP status, console
+errors, uncaught errors, failed requests and the Next.js error overlay, then
+saves a full-page screenshot to read back. It exits 1 if any page has a problem.
+It reuses a server already on port 4488, or starts `bun run dev` and stops it
+afterwards. Loading the dashboard triggers the usual automatic sync.
 
 `.claude/verify` is the finish check. The pre-commit hook runs lint-staged,
 typecheck, lint, tests and `fallow --fail-on-issues`; commit-msg enforces

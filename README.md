@@ -79,7 +79,12 @@ by your account.
 bun run dev        # start with hot reload on port 4488
 bun run test       # run tests with coverage thresholds
 bun run verify     # run tests, types, lint, fallow and a production build
+bun run browser:check  # load every page in headless Chrome and report errors
 ```
+
+`browser:check` needs Google Chrome. It signs in with the current token, saves a
+screenshot of each page and exits with an error if a page fails to load or logs
+an error.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org). The
 pre-commit hook runs formatting, type checks, lint, tests and
