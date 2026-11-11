@@ -1,3 +1,6 @@
+import { EmptyNote, SectionHeading } from "@/components/layout/page-shell";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { dayKey } from "@/lib/metrics/buckets";
 import type { Range, Summary } from "@/lib/metrics/summary";
 import { REVIEW_STATUS_LABELS } from "@/lib/review-status";
@@ -15,30 +18,20 @@ const REVIEWER_LABELS: StatusLabels = {
   approved: "Approved",
 };
 
-const ACCENT_BY_STORY_TYPE: Record<string, string> = {
-  feature: "border-l-story-feature",
-  bug: "border-l-story-bug",
-  chore: "border-l-story-chore",
+const DOT_BY_STORY_TYPE: Record<string, string> = {
+  feature: "bg-story-feature",
+  bug: "bg-story-bug",
+  chore: "bg-story-chore",
 };
 
-const DEFAULT_ACCENT = "border-l-rule";
-
-const STICKY_BY_STORY_TYPE: Record<string, string> = {
-  feature: "bg-sticky-feature",
-  bug: "bg-sticky-bug",
-  chore: "bg-sticky-chore",
-};
-
-const DEFAULT_STICKY = "bg-paper";
+const DEFAULT_DOT = "bg-muted-foreground";
 
 const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-function accentFor(storyType: string | null): string {
-  return (storyType && ACCENT_BY_STORY_TYPE[storyType]) || DEFAULT_ACCENT;
-}
+const TITLE_LINK_CLASS = "font-medium underline-offset-4 hover:underline";
 
-function stickyFor(storyType: string | null): string {
-  return (storyType && STICKY_BY_STORY_TYPE[storyType]) || DEFAULT_STICKY;
+function dotFor(storyType: string | null): string {
+  return (storyType && DOT_BY_STORY_TYPE[storyType]) || DEFAULT_DOT;
 }
 
 function capitalise(text: string): string {
@@ -74,11 +67,11 @@ function PullRequestStatus({
   labels: StatusLabels;
 }) {
   if (pullRequests.length === 0)
-    return <span className="text-sm text-ink-soft">No PR yet, still brewing</span>;
+    return <span className="text-sm text-muted-foreground">No PR yet, still brewing</span>;
   return (
-    <ul className="flex flex-col gap-1 text-sm">
+    <ul className="flex flex-col gap-2 text-sm">
       {pullRequests.map((pullRequest) => (
-        <li key={pullRequest.url} className="flex flex-col">
+        <li key={pullRequest.url} className="flex flex-col gap-0.5">
           <a
             href={pullRequest.url}
             target="_blank"
@@ -87,7 +80,7 @@ function PullRequestStatus({
           >
             {pullRequest.title}
           </a>
-          <span className="text-ink-soft">
+          <span className="font-mono text-xs text-muted-foreground">
             {pullRequestReference(pullRequest.url)} · {pullRequestStatus(pullRequest, labels)}
           </span>
         </li>
@@ -99,35 +92,45 @@ function PullRequestStatus({
 function TicketCard({ ticket, labels }: { ticket: Ticket; labels: StatusLabels }) {
   const label = `sc-${ticket.id}`;
   return (
-    <article
-      aria-label={label}
-      className={`flex flex-col gap-3 rounded-sm border-l-4 p-4 doodle-shadow transition odd:-rotate-1 even:rotate-1 hover:rotate-0 ${accentFor(ticket.storyType)} ${stickyFor(ticket.storyType)}`}
-    >
-      <div className="flex items-baseline justify-between gap-3 text-sm text-ink-soft">
-        <span className="flex gap-2">
-          <span>{label}</span>
-          {ticket.storyType ? <span>{capitalise(ticket.storyType)}</span> : null}
-        </span>
-        {ticket.estimate === null ? null : <span>{estimateText(ticket.estimate)}</span>}
-      </div>
-      <a
-        href={ticket.url}
-        target="_blank"
-        rel="noreferrer"
-        className="font-medium underline-offset-4 hover:underline"
-      >
-        {ticket.title}
-      </a>
-      {ticket.role === "reviewing" ? (
-        <span className="text-sm text-ink-soft">Owned by {ticket.owners.join(", ")}</span>
-      ) : null}
-      {ticket.role === "completed" && ticket.completedAt !== null ? (
-        <span className="text-sm text-ink-soft">{completedText(ticket.completedAt)}</span>
-      ) : null}
-      <div className="mt-auto flex flex-wrap items-start justify-between gap-3">
-        <span className="sketch-border px-2 py-0.5 text-sm">{ticket.state}</span>
-        <PullRequestStatus pullRequests={ticket.pullRequests} labels={labels} />
-      </div>
+    <article aria-label={label} className="flex">
+      <Card className="flex-1 transition-colors hover:ring-foreground/25">
+        <CardHeader className="flex items-center justify-between gap-3 text-muted-foreground">
+          <span className="flex items-center gap-2">
+            <span className="font-mono text-xs">{label}</span>
+            {ticket.storyType ? (
+              <span className="flex items-center gap-1.5 text-xs">
+                <span
+                  aria-hidden="true"
+                  className={`size-2 rounded-full ${dotFor(ticket.storyType)}`}
+                />
+                {capitalise(ticket.storyType)}
+              </span>
+            ) : null}
+          </span>
+          {ticket.estimate === null ? null : (
+            <span className="text-xs">{estimateText(ticket.estimate)}</span>
+          )}
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col gap-2">
+          <a href={ticket.url} target="_blank" rel="noreferrer" className={TITLE_LINK_CLASS}>
+            {ticket.title}
+          </a>
+          {ticket.role === "reviewing" ? (
+            <span className="text-sm text-muted-foreground">
+              Owned by {ticket.owners.join(", ")}
+            </span>
+          ) : null}
+          {ticket.role === "completed" && ticket.completedAt !== null ? (
+            <span className="text-sm text-muted-foreground">
+              {completedText(ticket.completedAt)}
+            </span>
+          ) : null}
+        </CardContent>
+        <CardFooter className="flex-col items-start gap-3 bg-muted">
+          <Badge variant="outline">{ticket.state}</Badge>
+          <PullRequestStatus pullRequests={ticket.pullRequests} labels={labels} />
+        </CardFooter>
+      </Card>
     </article>
   );
 }
@@ -144,10 +147,10 @@ function CardSection({
   labels?: StatusLabels;
 }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-3">
-      <h2 className="font-hand text-3xl font-bold">{title}</h2>
+    <section aria-label={title} className="flex flex-col gap-4">
+      <SectionHeading title={title} />
       {tickets.length === 0 ? (
-        <p className="text-ink-soft">{emptyText}</p>
+        <EmptyNote>{emptyText}</EmptyNote>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tickets.map((ticket) => (
@@ -161,20 +164,19 @@ function CardSection({
 
 function UnlinkedPullRequest({ item }: { item: OpenItem }) {
   return (
-    <li className="flex flex-col">
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noreferrer"
-        className="font-medium underline-offset-4 hover:underline"
-      >
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+      <a href={item.url} target="_blank" rel="noreferrer" className={TITLE_LINK_CLASS}>
         {item.title}
       </a>
-      {item.isDraft ? <span className="text-sm text-ink-soft">Draft</span> : null}
+      {item.isDraft ? <Badge variant="secondary">Draft</Badge> : null}
       {item.reviewStatus === null ? null : (
-        <span className="text-sm text-ink-soft">{REVIEW_STATUS_LABELS[item.reviewStatus]}</span>
+        <span className="text-sm text-muted-foreground">
+          {REVIEW_STATUS_LABELS[item.reviewStatus]}
+        </span>
       )}
-      {item.repo ? <span className="text-sm text-ink-soft">{item.repo}</span> : null}
+      {item.repo ? (
+        <span className="font-mono text-xs text-muted-foreground">{item.repo}</span>
+      ) : null}
     </li>
   );
 }
@@ -189,9 +191,9 @@ function unlinkedPullRequests(open: Summary["open"]): OpenItem[] {
 function UnlinkedPullRequests({ items }: { items: OpenItem[] }) {
   if (items.length === 0) return null;
   return (
-    <section aria-label="Open PRs without a ticket" className="flex flex-col gap-3">
-      <h3 className="font-hand text-2xl font-bold">Open PRs without a ticket</h3>
-      <ul className="flex flex-col gap-3">
+    <section aria-label="Open PRs without a ticket" className="flex flex-col gap-4">
+      <SectionHeading title="Open PRs without a ticket" level={3} />
+      <ul className="divide-y rounded-xl border bg-card">
         {items.map((item) => (
           <UnlinkedPullRequest key={item.externalId} item={item} />
         ))}
@@ -211,7 +213,7 @@ export function TicketCards({
 }) {
   const phrase = rangePhrase(range);
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-14">
       <CardSection
         title="Your tickets"
         emptyText="Your desk is clear. Suspiciously clear."

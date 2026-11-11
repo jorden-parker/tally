@@ -1,64 +1,114 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 :root {
   color-scheme: light dark;
-  --paper: #fcfcfb;
-  --ink: #1d2430;
-  --ink-soft: #52514e;
-  --rule: #e3e1dc;
-  --series-reviewed: #2a78d6;
+  --radius: 0.5rem;
+
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #171717;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #171717;
+  --muted: #fafafa;
+  --muted-foreground: #666666;
+  --accent: #f2f2f2;
+  --accent-foreground: #171717;
+  --destructive: #cb2a2f;
+  --destructive-surface: #fff0f0;
+  --border: #ebebeb;
+  --input: #e0e0e0;
+  --ring: #0070f3;
+
+  --series-reviewed: #0070f3;
   --series-created: #eb6834;
   --story-feature: #c9a227;
-  --story-bug: #c75450;
-  --story-chore: #6b8e9f;
-  --grid-dot: #dedbd3;
+  --story-bug: #d93036;
+  --story-chore: #5b8aa0;
   --highlight: #ffe27a;
-  --sticky-feature: #fbf3d2;
-  --sticky-bug: #fbe4e2;
-  --sticky-chore: #e2edf2;
-  --shadow-ink: #1d2430;
+  --grid-dot: #e6e6e6;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #1a1a19;
-    --ink: #f0efec;
-    --ink-soft: #c3c2b7;
-    --rule: #34332f;
-    --series-reviewed: #3987e5;
-    --series-created: #d95926;
+    --background: #000000;
+    --foreground: #ededed;
+    --card: #0a0a0a;
+    --card-foreground: #ededed;
+    --popover: #0a0a0a;
+    --popover-foreground: #ededed;
+    --primary: #ededed;
+    --primary-foreground: #0a0a0a;
+    --secondary: #1a1a1a;
+    --secondary-foreground: #ededed;
+    --muted: #0a0a0a;
+    --muted-foreground: #a1a1a1;
+    --accent: #1f1f1f;
+    --accent-foreground: #ededed;
+    --destructive: #ff6166;
+    --destructive-surface: #2a1314;
+    --border: #262626;
+    --input: #333333;
+    --ring: #3291ff;
+
+    --series-reviewed: #3291ff;
+    --series-created: #f07d4c;
     --story-feature: #d4b44a;
-    --story-bug: #d8706c;
+    --story-bug: #ff6166;
     --story-chore: #86a6b6;
-    --grid-dot: #33322e;
-    --highlight: #6e5c1c;
-    --sticky-feature: #2e2a1c;
-    --sticky-bug: #33211f;
-    --sticky-chore: #1e2a30;
-    --shadow-ink: #5c5a52;
+    --highlight: #b8921f;
+    --grid-dot: #1f1f1f;
   }
 }
 
 @theme inline {
-  --color-paper: var(--paper);
-  --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
-  --color-rule: var(--rule);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
   --color-reviewed: var(--series-reviewed);
   --color-created: var(--series-created);
   --color-story-feature: var(--story-feature);
   --color-story-bug: var(--story-bug);
   --color-story-chore: var(--story-chore);
-  --color-grid-dot: var(--grid-dot);
   --color-highlight: var(--highlight);
-  --color-sticky-feature: var(--sticky-feature);
-  --color-sticky-bug: var(--sticky-bug);
-  --color-sticky-chore: var(--sticky-chore);
-  --color-shadow-ink: var(--shadow-ink);
-  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 4);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --font-hand: var(--font-caveat), "Comic Sans MS", cursive;
+
   --animate-draw: draw 450ms ease-out both;
 
   @keyframes draw {
@@ -73,11 +123,6 @@
   }
 }
 
-@utility sketch-border {
-  border: 2px solid var(--ink);
-  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
-}
-
 @utility highlighter {
   background-image: linear-gradient(
     100deg,
@@ -87,35 +132,31 @@
     transparent 99%
   );
   background-repeat: no-repeat;
-  background-size: 100% 60%;
-  background-position: 0 85%;
+  background-size: 100% 45%;
+  background-position: 0 90%;
   box-decoration-break: clone;
 }
 
-@utility doodle-shadow {
-  box-shadow: 3px 3px 0 var(--shadow-ink);
-}
-
-@utility wobble {
-  transition: rotate 150ms ease-out;
-
-  &:hover {
-    rotate: -2deg;
-  }
-}
-
-body {
-  background-color: var(--paper);
+@utility dot-grid {
   background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
-  background-size: 22px 22px;
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-variant-numeric: tabular-nums;
+  background-size: 20px 20px;
+  mask-image: linear-gradient(to bottom, black 40%, transparent);
 }
 
-:focus-visible {
-  outline: 2px solid var(--series-reviewed);
-  outline-offset: 2px;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

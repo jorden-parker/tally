@@ -76,9 +76,11 @@ function Legend() {
 function TableView({ points }: DailyChartProps) {
   return (
     <details className="text-sm">
-      <summary className="cursor-pointer text-ink-soft">View as table</summary>
-      <table className="mt-2 w-full max-w-md text-left">
-        <thead>
+      <summary className="w-fit cursor-pointer rounded-md text-muted-foreground hover:text-foreground">
+        View as table
+      </summary>
+      <table className="mt-3 w-full max-w-md text-left [&_td]:py-1 [&_th]:py-1">
+        <thead className="border-b text-muted-foreground">
           <tr>
             <th scope="col">Day</th>
             <th scope="col">Reviewed</th>
@@ -116,7 +118,7 @@ function Tooltip({ point, index, width }: { point: DailyPoint; index: number; wi
     <div
       role="tooltip"
       style={style}
-      className={`sketch-border doodle-shadow pointer-events-none absolute top-0 flex flex-col bg-paper px-3 py-2 text-sm ${className}`}
+      className={`pointer-events-none absolute top-0 flex flex-col rounded-lg border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md ${className}`}
     >
       <strong className="font-hand text-xl leading-none">{formatDay(point.day)}</strong>
       <span>{point.reviewed} reviewed</span>
@@ -142,7 +144,11 @@ export function DailyChart({ points }: DailyChartProps) {
           viewBox={`0 0 ${width} ${height}`}
           className="h-auto w-full"
         >
-          <g className="font-hand text-ink-soft" fontSize={AXIS_FONT_SIZE} fill="currentColor">
+          <g
+            className="font-hand text-muted-foreground"
+            fontSize={AXIS_FONT_SIZE}
+            fill="currentColor"
+          >
             <text x={LEFT - 6} y={TOP + 4} textAnchor="end">
               {scale}
             </text>
@@ -150,8 +156,8 @@ export function DailyChart({ points }: DailyChartProps) {
               0
             </text>
           </g>
-          <line x1={LEFT} x2={width} y1={TOP} y2={TOP} className="stroke-rule" />
-          <line x1={LEFT} x2={width} y1={baseline} y2={baseline} className="stroke-rule" />
+          <line x1={LEFT} x2={width} y1={TOP} y2={TOP} className="stroke-border" />
+          <line x1={LEFT} x2={width} y1={baseline} y2={baseline} className="stroke-border" />
           {points.map((point, index) => {
             const left = LEFT + index * COLUMN_WIDTH;
             const barsStart = left + (COLUMN_WIDTH - (2 * BAR_WIDTH + BAR_GAP)) / 2;
@@ -170,7 +176,7 @@ export function DailyChart({ points }: DailyChartProps) {
                     y={baseline + 16}
                     fontSize={AXIS_FONT_SIZE}
                     fill="currentColor"
-                    className="font-hand text-ink-soft"
+                    className="font-hand text-muted-foreground"
                   >
                     {formatDay(point.day)}
                   </text>

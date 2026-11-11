@@ -28,10 +28,11 @@ describe("pages", () => {
     expect(screen.getByText("work log")).toBeDefined();
   });
 
-  it("render the settings form with a way back", () => {
+  it("render the settings form", () => {
     render(<SettingsPage />);
 
     expect(screen.getByText("settings form")).toBeDefined();
-    expect(screen.getByRole("link", { name: "Back to dashboard" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeDefined();
+    expect(screen.getByText("Choose what Tally counts and how it reads your week.")).toBeDefined();
   });
 });

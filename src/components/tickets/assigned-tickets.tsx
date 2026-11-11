@@ -1,7 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
+import {
+  EmptyNote,
+  LoadingNote,
+  PageShell,
+  ProblemAlert,
+  SectionHeading,
+} from "@/components/layout/page-shell";
+import { Badge } from "@/components/ui/badge";
+import {
+  NativeSelect,
+  NativeSelectOptGroup,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { dayKey } from "@/lib/metrics/buckets";
 import {
   ALL_STATUSES,
@@ -20,7 +32,7 @@ import { useAssignedTickets } from "./use-assigned-tickets";
 
 const SEPARATOR = " · ";
 const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const FIELD_CLASS = "sketch-border bg-paper px-2 py-1 text-ink";
+const FIELD_LABEL_CLASS = "flex items-center gap-2 text-sm text-muted-foreground";
 
 const GROUPING_LABELS: Record<StatusGrouping, string> = {
   state: "Workflow state",
@@ -30,7 +42,6 @@ const GROUPING_LABELS: Record<StatusGrouping, string> = {
 
 function describeStory(story: AssignedStory): string {
   return [
-    `sc-${story.id}`,
     story.storyType,
     story.estimate === null ? null : `${story.estimate} pt`,
     story.completedAt === null
@@ -43,31 +54,33 @@ function describeStory(story: AssignedStory): string {
 
 function StoryRow({ story }: { story: AssignedStory }) {
   return (
-    <li className="flex flex-col">
-      <a
-        href={story.url}
-        target="_blank"
-        rel="noreferrer"
-        className="font-medium underline-offset-4 hover:underline"
-      >
-        {story.title}
-      </a>
-      <span className="text-sm text-ink-soft">
-        {describeStory(story)}
-        {SEPARATOR}
-        <span className="sketch-border px-1.5">{story.state}</span>
-      </span>
+    <li className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <a
+          href={story.url}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium underline-offset-4 hover:underline"
+        >
+          {story.title}
+        </a>
+        <span className="text-sm text-muted-foreground">
+          <span className="font-mono text-xs">sc-{story.id}</span>
+          {describeStory(story) === "" ? null : `${SEPARATOR}${describeStory(story)}`}
+        </span>
+      </div>
+      <Badge variant="outline" className="shrink-0">
+        {story.state}
+      </Badge>
     </li>
   );
 }
 
 function GroupSection({ group }: { group: StoryGroup }) {
   return (
-    <section aria-label={group.label} className="flex flex-col gap-3">
-      <h2 className="font-hand text-3xl font-bold">
-        {group.label} ({group.stories.length})
-      </h2>
-      <ul className="flex flex-col gap-3">
+    <section aria-label={group.label} className="flex flex-col gap-4">
+      <SectionHeading title={group.label} count={group.stories.length} />
+      <ul className="divide-y rounded-xl border bg-card">
         {group.stories.map((story) => (
           <StoryRow key={story.id} story={story} />
         ))}
@@ -86,27 +99,25 @@ function StatusSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-ink-soft">
+    <label className={FIELD_LABEL_CLASS}>
       Status
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={FIELD_CLASS}
-      >
-        <option value={ALL_STATUSES}>All statuses</option>
+      <NativeSelect value={value} onChange={(event) => onChange(event.target.value)}>
+        <NativeSelectOption value={ALL_STATUSES}>All statuses</NativeSelectOption>
         {listStatusOptions(stories).map((option) => (
-          <optgroup key={option.label} label={option.label}>
+          <NativeSelectOptGroup key={option.label} label={option.label}>
             {option.type === null ? null : (
-              <option value={filterForType(option.type)}>Any {option.label.toLowerCase()}</option>
+              <NativeSelectOption value={filterForType(option.type)}>
+                Any {option.label.toLowerCase()}
+              </NativeSelectOption>
             )}
             {option.states.map((state) => (
-              <option key={state} value={filterForState(state)}>
+              <NativeSelectOption key={state} value={filterForState(state)}>
                 {state}
-              </option>
+              </NativeSelectOption>
             ))}
-          </optgroup>
+          </NativeSelectOptGroup>
         ))}
-      </select>
+      </NativeSelect>
     </label>
   );
 }
@@ -119,19 +130,18 @@ function GroupingSelect({
   onChange: (value: StatusGrouping) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-ink-soft">
+    <label className={FIELD_LABEL_CLASS}>
       Group by
-      <select
+      <NativeSelect
         value={value}
         onChange={(event) => onChange(event.target.value as StatusGrouping)}
-        className={FIELD_CLASS}
       >
         {Object.entries(GROUPING_LABELS).map(([grouping, label]) => (
-          <option key={grouping} value={grouping}>
+          <NativeSelectOption key={grouping} value={grouping}>
             {label}
-          </option>
+          </NativeSelectOption>
         ))}
-      </select>
+      </NativeSelect>
     </label>
   );
 }
@@ -142,12 +152,12 @@ function TicketList({ stories }: { stories: AssignedStory[] }) {
   const groups = groupByStatus(filterByStatus(stories, status), grouping);
   return (
     <>
-      <div className="flex flex-wrap gap-4">
+      <div className="-mt-4 flex flex-wrap gap-4 border-b pb-6">
         <StatusSelect stories={stories} value={status} onChange={setStatus} />
         <GroupingSelect value={grouping} onChange={setGrouping} />
       </div>
       {groups.length === 0 ? (
-        <p className="text-ink-soft">No tickets here. Try another status, or sync.</p>
+        <EmptyNote>No tickets here. Try another status, or sync.</EmptyNote>
       ) : (
         groups.map((group) => <GroupSection key={group.key} group={group} />)
       )}
@@ -158,25 +168,15 @@ function TicketList({ stories }: { stories: AssignedStory[] }) {
 export function AssignedTickets({ api = realApi }: { api?: TallyApi }) {
   const { stories, problem } = useAssignedTickets(api);
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 pt-10 pb-28">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="highlighter px-1 font-hand text-5xl font-bold">All my tickets</h1>
-        <Link href="/" className="wobble text-sm underline underline-offset-4">
-          Dashboard
-        </Link>
-      </header>
-      {problem === null ? null : (
-        <p role="alert" className="max-w-2xl -rotate-1 rounded-sm bg-sticky-bug p-4 doodle-shadow">
-          {problem}
-        </p>
-      )}
+    <PageShell title="Tickets" description="Every Shortcut story you own, by status.">
+      <ProblemAlert messages={problem === null ? [] : [problem]} />
       {stories === null ? (
         problem === null ? (
-          <p className="font-hand text-2xl text-ink-soft">Sharpening pencils…</p>
+          <LoadingNote />
         ) : null
       ) : (
         <TicketList stories={stories} />
       )}
-    </main>
+    </PageShell>
   );
 }

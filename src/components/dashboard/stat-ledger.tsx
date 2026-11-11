@@ -12,10 +12,10 @@ type FigureProps = { label: string; value: number; note: string };
 
 function Figure({ label, value, note }: FigureProps) {
   return (
-    <div className="flex flex-col gap-1 border-l-2 border-dashed border-ink-soft pl-4">
-      <dt className="text-sm text-ink-soft">{label}</dt>
-      <dd className="font-hand text-5xl font-bold">{value}</dd>
-      <dd className="text-sm text-ink-soft">{note}</dd>
+    <div className="grid grid-cols-[1fr_auto] items-center gap-x-4 px-6 py-5">
+      <dt className="text-sm font-medium">{label}</dt>
+      <dd className="row-span-2 font-hand text-5xl leading-none font-bold">{value}</dd>
+      <dd className="text-sm text-muted-foreground">{note}</dd>
     </div>
   );
 }
@@ -23,13 +23,13 @@ function Figure({ label, value, note }: FigureProps) {
 function Hero({ summary }: { summary: Summary }) {
   const { reviewed } = summary.current;
   return (
-    <section aria-label="Reviewed this period" className="flex flex-col gap-3">
+    <section aria-label="Reviewed this period" className="flex flex-col gap-4 p-6 sm:p-8">
       <TallyMarks count={reviewed} label={`${reviewed} PRs reviewed`} />
       <p className="flex items-baseline gap-3">
-        <span className="font-hand text-8xl font-bold leading-none">{reviewed}</span>
-        <span className="text-lg">PRs reviewed</span>
+        <span className="font-hand text-8xl leading-none font-bold">{reviewed}</span>
+        <span className="text-lg font-medium tracking-tight">PRs reviewed</span>
       </p>
-      <p className="text-ink-soft">
+      <p className="text-muted-foreground">
         {deltaText(reviewed, summary.previous.reviewed, summary.range)}
       </p>
     </section>
@@ -38,9 +38,9 @@ function Hero({ summary }: { summary: Summary }) {
 
 export function StatLedger({ summary }: { summary: Summary }) {
   return (
-    <div className="flex flex-col gap-8">
+    <div className="grid overflow-hidden rounded-xl border bg-card lg:grid-cols-[3fr_2fr]">
       <Hero summary={summary} />
-      <dl className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <dl className="flex flex-col divide-y border-t lg:border-t-0 lg:border-l">
         {PERIOD_FIGURES.map(({ label, key }) => (
           <Figure
             key={key}

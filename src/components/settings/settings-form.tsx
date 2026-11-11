@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { ProblemAlert } from "@/components/layout/page-shell";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import type { WeekStart } from "@/lib/metrics/buckets";
 import type { Settings } from "@/lib/store/settings";
 import { api as realApi, type TallyApi } from "../api";
@@ -63,64 +70,62 @@ export function SettingsForm({ api = realApi }: SettingsFormProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {error ? (
-        <p role="alert" className="max-w-2xl -rotate-1 rounded-sm bg-sticky-bug p-4 doodle-shadow">
-          {error}
-        </p>
-      ) : null}
+    <div className="flex max-w-2xl flex-col gap-6">
+      {error ? <ProblemAlert messages={[error]} /> : null}
       {loaded && fields ? (
-        <form onSubmit={save} className="flex max-w-xl flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="allow-list" className="font-medium">
-              GitHub orgs and repos
-            </label>
-            <p id="allow-list-hint" className="text-sm text-ink-soft">
-              One per line, as an owner (acme) or a repo (acme/api).
-            </p>
-            <textarea
-              id="allow-list"
-              aria-describedby="allow-list-hint"
-              value={fields.allowList}
-              onChange={(event) => change("allowList", event.target.value)}
-              rows={6}
-              className="sketch-border bg-paper p-2 font-mono"
-            />
-          </div>
-          <label className="flex flex-col gap-2">
-            <span className="font-medium">Week starts on</span>
-            <select
-              value={fields.weekStart}
-              onChange={(event) => change("weekStart", event.target.value)}
-              className="sketch-border bg-paper p-2"
-            >
-              <option value="1">Monday</option>
-              <option value="0">Sunday</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="font-medium">Time zone</span>
-            <input
-              list="time-zones"
-              value={fields.timeZone}
-              onChange={(event) => change("timeZone", event.target.value)}
-              className="sketch-border bg-paper p-2"
-            />
-            <datalist id="time-zones">
-              {TIME_ZONES.map((zone) => (
-                <option key={zone} value={zone} />
-              ))}
-            </datalist>
-          </label>
-          <div className="flex items-center gap-4">
-            <button
-              type="submit"
-              className="sketch-border doodle-shadow bg-highlight px-4 py-2 font-semibold text-ink transition active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
-            >
-              Save settings
-            </button>
-            {saved ? <p>Saved. Sync from the dashboard to pull in new repos.</p> : null}
-          </div>
+        <form onSubmit={save}>
+          <Card className="gap-0 py-0">
+            <CardContent className="flex flex-col gap-8 py-6">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="allow-list">GitHub orgs and repos</Label>
+                <p id="allow-list-hint" className="text-sm text-muted-foreground">
+                  One per line, as an owner (acme) or a repo (acme/api).
+                </p>
+                <Textarea
+                  id="allow-list"
+                  aria-describedby="allow-list-hint"
+                  value={fields.allowList}
+                  onChange={(event) => change("allowList", event.target.value)}
+                  rows={6}
+                  className="min-h-36 font-mono"
+                />
+              </div>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="week-start">Week starts on</Label>
+                  <NativeSelect
+                    id="week-start"
+                    value={fields.weekStart}
+                    onChange={(event) => change("weekStart", event.target.value)}
+                    className="w-full"
+                  >
+                    <NativeSelectOption value="1">Monday</NativeSelectOption>
+                    <NativeSelectOption value="0">Sunday</NativeSelectOption>
+                  </NativeSelect>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="time-zone">Time zone</Label>
+                  <Input
+                    id="time-zone"
+                    list="time-zones"
+                    value={fields.timeZone}
+                    onChange={(event) => change("timeZone", event.target.value)}
+                  />
+                  <datalist id="time-zones">
+                    {TIME_ZONES.map((zone) => (
+                      <option key={zone} value={zone} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="justify-between gap-4 bg-muted px-6 py-3">
+              <p aria-live="polite" className="text-sm text-muted-foreground">
+                {saved ? "Saved. Sync from the dashboard to pull in new repos." : ""}
+              </p>
+              <Button type="submit">Save settings</Button>
+            </CardFooter>
+          </Card>
         </form>
       ) : null}
     </div>

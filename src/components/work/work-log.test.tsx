@@ -206,10 +206,4 @@ describe("WorkLog", () => {
     expect(download.getAttribute("download")).toBe("work-log-2026-10-01-to-2026-10-30.md");
     expect(decodeURIComponent(download.getAttribute("href") ?? "")).toContain("## PRs merged (1)");
   });
-
-  it("links back to the dashboard", () => {
-    render(<WorkLog api={fakeApi()} now={now} />);
-
-    expect(screen.getByRole("link", { name: "Back to dashboard" }).getAttribute("href")).toBe("/");
-  });
 });

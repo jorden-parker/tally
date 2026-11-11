@@ -1,7 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import {
+  EmptyNote,
+  LoadingNote,
+  PageShell,
+  ProblemAlert,
+  SectionHeading,
+} from "@/components/layout/page-shell";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   groupByDay,
   type DraftRow,
@@ -23,9 +32,9 @@ import { useWorkLog } from "./use-work-log";
 
 const currentTime = () => new Date();
 
-const BUTTON_CLASS =
-  "sketch-border doodle-shadow bg-paper px-3 py-1.5 text-sm text-ink transition active:translate-x-[3px] active:translate-y-[3px] active:shadow-none";
+const BUTTON_CLASS = buttonVariants({ variant: "outline", size: "lg", className: "px-3" });
 const SEPARATOR = " · ";
+const ROW_LIST_CLASS = "divide-y rounded-xl border bg-card";
 
 type WorkLogProps = { api?: TallyApi; now?: () => Date };
 
@@ -39,13 +48,13 @@ function DateField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-ink-soft">
+    <label className="flex items-center gap-2 text-sm text-muted-foreground">
       {label}
-      <input
+      <Input
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="sketch-border bg-paper px-2 py-1 text-ink"
+        className="w-auto bg-background"
       />
     </label>
   );
@@ -53,9 +62,9 @@ function DateField({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col">
-      <dt className="text-sm text-ink-soft">{label}</dt>
-      <dd className="font-hand text-4xl font-bold">{value}</dd>
+    <div className="flex flex-col gap-1">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="font-hand text-4xl leading-none font-bold">{value}</dd>
     </div>
   );
 }
@@ -74,15 +83,19 @@ function TotalsBlock({
   children: ReactNode;
 }) {
   return (
-    <div role="group" aria-label={title} className="flex flex-col gap-3">
-      <h3 className="font-hand text-2xl font-bold text-ink-soft">{title}</h3>
-      <dl className="grid grid-cols-3 gap-6">{children}</dl>
-      {notes.map((note) => (
-        <p key={note} className="text-sm text-ink-soft">
-          {note}
-        </p>
-      ))}
-    </div>
+    <Card role="group" aria-label={title}>
+      <CardHeader>
+        <SectionHeading title={title} level={3} />
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <dl className="grid grid-cols-3 gap-6">{children}</dl>
+        {notes.map((note) => (
+          <p key={note} className="text-sm text-muted-foreground">
+            {note}
+          </p>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -121,7 +134,7 @@ function TicketTotals({ totals }: { totals: WorkTotals }) {
 
 function Totals({ totals }: { totals: WorkTotals }) {
   return (
-    <section aria-label="Totals" className="grid grid-cols-1 gap-8 md:grid-cols-2">
+    <section aria-label="Totals" className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <PullRequestTotals totals={totals} />
       <TicketTotals totals={totals} />
     </section>
@@ -143,9 +156,9 @@ function RowLink({ row }: { row: WorkRow | DraftRow }) {
 
 function WorkRowItem({ row }: { row: WorkRow }) {
   return (
-    <li className="flex flex-col gap-1">
+    <li className="flex flex-col gap-1 px-4 py-3">
       <RowLink row={row} />
-      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-soft">
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
         {detailParts(row).map((part) => (
           <li key={part}>{part}</li>
         ))}
@@ -163,9 +176,9 @@ function draftLine(row: DraftRow): string {
 
 function DraftRowItem({ row }: { row: DraftRow }) {
   return (
-    <li className="flex flex-col">
+    <li className="flex flex-col gap-1 px-4 py-3">
       <RowLink row={row} />
-      <span className="text-sm text-ink-soft">{draftLine(row)}</span>
+      <span className="text-sm text-muted-foreground">{draftLine(row)}</span>
     </li>
   );
 }
@@ -183,10 +196,8 @@ function RowSection({
 }) {
   return (
     <section aria-label={title} className="flex flex-col gap-4">
-      <h2 className="font-hand text-3xl font-bold">
-        {title} ({count})
-      </h2>
-      {count === 0 ? <p className="text-ink-soft">{emptyText}</p> : children}
+      <SectionHeading title={title} count={count} />
+      {count === 0 ? <EmptyNote>{emptyText}</EmptyNote> : children}
     </section>
   );
 }
@@ -195,9 +206,9 @@ function DayGroups({ rows }: { rows: WorkRow[] }) {
   return (
     <div className="flex flex-col gap-6">
       {groupByDay(rows).map(({ day, rows: dayRows }) => (
-        <div key={day} className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold text-ink-soft">{formatLongDay(day)}</h3>
-          <ul className="flex flex-col gap-3">
+        <div key={day} className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">{formatLongDay(day)}</h3>
+          <ul className={ROW_LIST_CLASS}>
             {dayRows.map((row) => (
               <WorkRowItem key={row.externalId} row={row} />
             ))}
@@ -232,19 +243,22 @@ function CopyButton({ text }: { text: string }) {
       () => setLabel("Copy failed"),
     );
   return (
-    <button type="button" onClick={copy} className={BUTTON_CLASS}>
+    <Button variant="outline" size="lg" onClick={copy} className="px-3">
       {label}
-    </button>
+    </Button>
   );
 }
 
 function Report({ report }: { report: WorkReport }) {
   return (
     <>
-      <p className="text-ink-soft">
-        {leadSentence(report.totals)}, {formatDayMonth(report.from)} to {formatDayMonth(report.to)}
-      </p>
-      <ExportActions report={report} />
+      <div className="-mt-4 flex flex-wrap items-center justify-between gap-4 border-b pb-6">
+        <p className="text-muted-foreground">
+          {leadSentence(report.totals)}, {formatDayMonth(report.from)} to{" "}
+          {formatDayMonth(report.to)}
+        </p>
+        <ExportActions report={report} />
+      </div>
       <Totals totals={report.totals} />
       <RowSection
         title="PRs merged"
@@ -265,7 +279,7 @@ function Report({ report }: { report: WorkReport }) {
         count={report.drafts.length}
         emptyText="No drafts on the go."
       >
-        <ul className="flex flex-col gap-3">
+        <ul className={ROW_LIST_CLASS}>
           {report.drafts.map((row) => (
             <DraftRowItem key={row.externalId} row={row} />
           ))}
@@ -279,30 +293,23 @@ export function WorkLog({ api = realApi, now = currentTime }: WorkLogProps) {
   const { period, setPeriod, report, problem } = useWorkLog(api, now);
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-10 px-6 pt-10 pb-28">
-      <Link href="/" className="text-sm text-ink-soft underline underline-offset-4">
-        Back to dashboard
-      </Link>
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="highlighter px-1 font-hand text-5xl font-bold">Work log</h1>
-        <div className="flex flex-wrap gap-3">
+    <PageShell
+      title="Work log"
+      description="What you shipped over any stretch of days."
+      actions={
+        <>
           <DateField
             label="From"
             value={period.from}
             onChange={(from) => setPeriod({ ...period, from })}
           />
           <DateField label="To" value={period.to} onChange={(to) => setPeriod({ ...period, to })} />
-        </div>
-      </header>
-      {problem === null ? null : (
-        <p role="alert" className="max-w-2xl -rotate-1 rounded-sm bg-sticky-bug p-4 doodle-shadow">
-          {problem}
-        </p>
-      )}
+        </>
+      }
+    >
+      <ProblemAlert messages={problem === null ? [] : [problem]} />
       {report ? <Report report={report} /> : null}
-      {report === null && problem === null ? (
-        <p className="font-hand text-2xl text-ink-soft">Sharpening pencils…</p>
-      ) : null}
-    </main>
+      {report === null && problem === null ? <LoadingNote /> : null}
+    </PageShell>
   );
 }
