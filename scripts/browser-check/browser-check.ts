@@ -13,6 +13,7 @@ export interface PageObservation {
   uncaughtErrors: string[];
   failedRequests: string[];
   errorOverlay: string | null;
+  scrollContainers: string[];
 }
 
 export interface BrowserSession {
@@ -50,6 +51,7 @@ export function findPageProblems(observation: PageObservation): string[] {
     ...observation.consoleErrors.map((text) => `console error: ${text}`),
     ...observation.uncaughtErrors.map((text) => `uncaught error: ${text}`),
     ...observation.failedRequests.map((text) => `failed request: ${text}`),
+    ...observation.scrollContainers.map((text) => `unexpected scrollbar: ${text}`),
     ...(observation.errorOverlay ? [`Next.js error overlay: ${observation.errorOverlay}`] : []),
   ];
 }

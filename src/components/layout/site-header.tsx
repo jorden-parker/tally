@@ -37,7 +37,7 @@ export function SiteHeader() {
           <TallyGlyph />
           <span className="text-lg font-semibold tracking-tight">Tally</span>
         </Link>
-        <nav aria-label="Pages" className="-mx-3 flex overflow-x-auto">
+        <nav aria-label="Pages" className="-mx-3 flex flex-wrap">
           {PAGES.map(({ href, label }) => {
             const isCurrent = pathname === href;
             return (

@@ -17,6 +17,7 @@ const healthyObservation: PageObservation = {
   uncaughtErrors: [],
   failedRequests: [],
   errorOverlay: null,
+  scrollContainers: [],
 };
 
 interface FakeCheck {
@@ -109,6 +110,27 @@ describe("findPageProblems", () => {
       "failed request: GET http://127.0.0.1:4488/api/metrics 500",
       "Next.js error overlay: Module not found: Can't resolve 'tw-animate-css'",
     ]);
+  });
+});
+
+describe("scroll containers", () => {
+  const scrollingObservation = {
+    ...healthyObservation,
+    scrollContainers: ["nav[aria-label=Pages] scrolls vertically by 2px"],
+  };
+
+  it("reports an element that scrolls unexpectedly", () => {
+    expect(findPageProblems(scrollingObservation)).toEqual([
+      "unexpected scrollbar: nav[aria-label=Pages] scrolls vertically by 2px",
+    ]);
+  });
+
+  it("fails the run when a page has an unexpected scrollbar", async () => {
+    const { dependencies } = createFakeCheck({
+      observations: { "http://127.0.0.1:4488/": scrollingObservation },
+    });
+
+    expect(await runBrowserCheck(checkOptions, dependencies)).toBe(false);
   });
 });
 

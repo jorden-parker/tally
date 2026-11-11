@@ -93,6 +93,40 @@ async function readErrorOverlay(page: Page): Promise<string | null> {
   return (await overlay.innerText()).replace(/\s+/g, " ").trim();
 }
 
+async function findScrollContainers(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const scrollingOverflows = ["auto", "scroll"];
+    const describeElement = (element: Element): string => {
+      const label = element.getAttribute("aria-label");
+      const firstClass = element.classList[0];
+      if (label) return `${element.localName}[aria-label=${label}]`;
+      if (element.id) return `${element.localName}#${element.id}`;
+      return firstClass ? `${element.localName}.${firstClass}` : element.localName;
+    };
+    const findOverflow = (element: Element) => {
+      const style = getComputedStyle(element);
+      const axes = [
+        {
+          direction: "horizontally",
+          overflow: style.overflowX,
+          excess: element.scrollWidth - element.clientWidth,
+        },
+        {
+          direction: "vertically",
+          overflow: style.overflowY,
+          excess: element.scrollHeight - element.clientHeight,
+        },
+      ];
+      return axes
+        .filter(({ overflow, excess }) => scrollingOverflows.includes(overflow) && excess > 0)
+        .map(({ direction, excess }) => `scrolls ${direction} by ${excess}px`);
+    };
+    return [...document.body.querySelectorAll("*")].flatMap((element) =>
+      findOverflow(element).map((overflow) => `${describeElement(element)} ${overflow}`),
+    );
+  });
+}
+
 async function observePage(
   context: BrowserContext,
   url: string,
@@ -126,6 +160,7 @@ async function observePage(
       uncaughtErrors,
       failedRequests,
       errorOverlay: await readErrorOverlay(page),
+      scrollContainers: await findScrollContainers(page),
     };
     await page.screenshot({ path: screenshotPath, fullPage: true });
     return observation;
